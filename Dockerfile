@@ -1,5 +1,5 @@
 # Use an official Python base image
-FROM python:3.10-slim
+FROM python:3.9-slim
 
 # Set environment variables to prevent Python from writing .pyc files and enable buffered output
 ENV PYTHONDONTWRITEBYTECODE=1
