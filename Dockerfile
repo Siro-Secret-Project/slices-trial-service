@@ -1,5 +1,5 @@
 # Use an official Python base image
-FROM python:3.9-slim
+FROM python:3.11-slim
 
 # Set environment variables to prevent Python from writing .pyc files and enable buffered output
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir poetry
 
 # Install dependencies using Poetry
 RUN poetry config virtualenvs.create false \
-    && poetry install --only main --no-interaction --no-ansi
+    && poetry install --without dev --no-interaction --no-ansi
 
 # Copy the rest of the application code into the container
 COPY . ./
