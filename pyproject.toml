@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "backend_python"
+version = "0.1.0"
+description = "Python Backend"
+authors = ["Saad Shirgaonkar <saad.shirgaonkar@siroclinpharm.com>"]
+license = "MIT"
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.6"
+motor = "^3.6.0"
+uvicorn = "^0.34.0"
+bs4 = "^0.0.2"
+openai = "^1.59.6"
+numpy = "^2.2.1"
+pinecone-client = "^5.0.1"
+transformers = "^4.48.0"
+torch = "^2.5.1"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
