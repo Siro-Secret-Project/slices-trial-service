@@ -1,10 +1,9 @@
-from typing import Literal, Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 class SearchResult(BaseModel):
     search_query: str
-    embedding_model: Literal["OpenAI", "BioBert"]
-    module: Optional[str] = "conditionsModule"
+    module: str = None
     similarity_threshold: int = 50
 
 class BaseResponse(BaseModel):

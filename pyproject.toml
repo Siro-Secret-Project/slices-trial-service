@@ -17,7 +17,6 @@ openai = "^1.59.6"
 numpy = "^2.2.1"
 pinecone-client = "^5.0.1"
 transformers = "^4.48.0"
-torch = "^2.5.1"
 
 
 [build-system]
