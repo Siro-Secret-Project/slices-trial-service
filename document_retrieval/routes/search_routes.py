@@ -14,14 +14,13 @@ async def search_routes(request: SearchResult, response: Response):
     )
     try:
         input_query = request.search_query
-        embedding_model = request.embedding_model
         similarity_threshold = request.similarity_threshold
-        # module = request.module
+        module = request.module
 
         # Fetch similar documents
         similar_documents_response = await fetch_documents_service(query=input_query,
                                                                    similarity_threshold=similarity_threshold,
-                                                                   embedding_model=embedding_model)
+                                                                   module=module)
         if similar_documents_response["success"] is False:
             base_response.success = False
             base_response.message = similar_documents_response["message"]
