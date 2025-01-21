@@ -2,7 +2,7 @@ import time
 from pinecone import Pinecone, ServerlessSpec
 from collections import defaultdict
 
-PINECONE_API_KEY = "pcsk_5Pm2YN_LaNZs81DEwZtnWTrRGfMUrJgGphmu8tc7g93piQnUzCJYamDSpf9rebWYshfqz2"
+PINECONE_API_KEY = "pcsk_2R5ZCx_NTXiWnbi8tr5avJ6yXEVGiB28MGQfUnCgvb6HHR29q9riu7Kseb6oAZUmxczPSQ"
 
 # Name of vector index DB
 index_name = "final-similarity-1"
