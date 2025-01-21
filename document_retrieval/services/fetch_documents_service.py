@@ -30,8 +30,12 @@ async def fetch_documents_service(query: str, similarity_threshold: int, module:
 
     # Compute Required results
     final_list = [{"nctId": key, "similarity_score": round(value["max_score"] * 100, 2)} for key, value in similar_documents.items()]
+
+    # Filtered List
+    filtered_list = [item for item in final_list if item['similarity_score'] >= float(similarity_threshold)]
+
     final_response["success"] = True
-    final_response["data"] = final_list
+    final_response["data"] = filtered_list
     final_response["message"] = f"Successfully fetched documents service"
     return final_response
   except Exception as e:
