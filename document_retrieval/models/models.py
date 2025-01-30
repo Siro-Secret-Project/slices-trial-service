@@ -13,6 +13,8 @@ class BaseResponse(BaseModel):
     status_code: int
 
 class SearchDocuments(BaseModel):
-    inclusion_criteria: str
-    exclusion_criteria: str
+    inclusionCriteria: str
+    exclusionCriteria: str
     rationale: str
+    objective: str
+    efficacyEndpoints: str

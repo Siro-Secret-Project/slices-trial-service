@@ -63,14 +63,18 @@ async def search_routes_new(request: SearchDocuments, response: Response):
 
     try:
         # Extract and sanitize input criteria
-        inclusion_criteria = request.inclusion_criteria if request.inclusion_criteria != "" else None
-        exclusion_criteria = request.exclusion_criteria if request.exclusion_criteria != "" else None
+        inclusion_criteria = request.inclusionCriteria if request.inclusionCriteria != "" else None
+        exclusion_criteria = request.exclusionCriteria if request.exclusionCriteria != "" else None
         rationale = request.rationale if request.rationale != "" else None
+        objective = request.objective if request.objective != "" else None
+        trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
 
         input_document = {
             "inclusion_criteria": inclusion_criteria,
             "exclusion_criteria": exclusion_criteria,
             "rationale": rationale,
+            "objective": objective,
+            "trial_outcomes": trial_outcomes,
         }
 
         # Fetch similar documents based on the input criteria
