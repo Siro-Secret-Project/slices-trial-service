@@ -1,7 +1,8 @@
-from fastapi import APIRouter,Response, status
+from fastapi import APIRouter,Response, status, Request
 from document_retrieval.models.models import SearchResult, BaseResponse, SearchDocuments
 from document_retrieval.services.fetch_documents_service import fetch_documents_service
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
+from document_retrieval.utils.calculate_weighted_similarity_score import calculate_weighted_similarity_score
 
 router = APIRouter()
 
@@ -59,6 +60,7 @@ async def search_routes_new(request: SearchDocuments, response: Response):
         status_code=status.HTTP_400_BAD_REQUEST,
         data=None,
         message="Internal Server Error",
+        eligibilityCriteria={}
     )
 
     try:
@@ -91,6 +93,7 @@ async def search_routes_new(request: SearchDocuments, response: Response):
             base_response.message = similar_documents_response["message"]
             base_response.status_code = status.HTTP_200_OK
             base_response.data = similar_documents_response["data"]
+            base_response.eligibilityCriteria = similar_documents_response["eligibilityCriteria"]
             response.status_code = status.HTTP_200_OK
             return base_response
 
@@ -101,4 +104,3 @@ async def search_routes_new(request: SearchDocuments, response: Response):
         base_response.message = f"Unexpected error: {e}"
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return base_response
-

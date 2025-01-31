@@ -1,6 +1,10 @@
 from providers.openai.generate_embeddings import validate_document_similarity
-from providers.pinecone.similarity_search_service import query_pinecone_db_extended
+from providers.pinecone.similarity_search_service import query_pinecone_db_extended, pinecone_index
+from providers.openai.generate_embeddings import azure_client
+from database.document_retrieval.fetch_processed_trial_document_with_nct_id import t2dm_collection
 from document_retrieval.utils.fetch_trial_filters import fetch_trial_filters
+from document_retrieval.utils.calculate_weighted_similarity_score import process_similarity_scores
+from agents.TrialEligibilityAgent import TrialEligibilityAgent
 
 async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
     """
@@ -48,6 +52,8 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
         trial_rationale_documents = process_criteria(
             documents_search_keys.get("rationale")
         )
+        for item in trial_rationale_documents:
+            item["module"] = "trialRationale"
 
         trial_objective_documents = process_criteria(
             documents_search_keys.get("objective"), module="identificationModule"
@@ -70,23 +76,50 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
             if nctId not in unique_documents or doc["similarity_score"] > unique_documents[nctId]["similarity_score"]:
                 unique_documents[nctId] = doc
 
-
         # filter documents
         fetch_add_documents_filter_response = fetch_trial_filters(trial_documents=list(unique_documents.values()))
         if fetch_add_documents_filter_response["success"] is True:
-            final_response.update({
-                "data": fetch_add_documents_filter_response["data"],
-                "success": True,
-                "message": "Successfully fetched additional documents.",
-            }
-            )
-            return final_response
+            trial_documents = fetch_add_documents_filter_response["data"]
+        else:
+            trial_documents = list(unique_documents.values())
 
-        final_response.update({
-            "success": True,
-            "message": "Successfully fetched similar documents extended.",
-            "data": list(unique_documents.values())
-        })
+        # Calculate weighted average for similarity score
+        # nctIds = [item["nctId"] for item in trial_documents]
+        # weighted_similarity_scores_response = process_similarity_scores(target_documents_ids=nctIds,
+        #                                                        user_input_document=documents_search_keys)
+        # if weighted_similarity_scores_response["success"] is True:
+        #     for item in weighted_similarity_scores_response["data"]:
+        #         for subitem in trial_documents:
+        #             if subitem["nctId"] == item["nctId"]:
+        #                 subitem["weighted_similarity_score"] = item["weighted_similarity_score"]
+        #         print("Calculated weighted_similarity_score")
+
+        # Generate Eligibility Criteria
+
+        eligibility_agent = TrialEligibilityAgent(azure_client,
+                                                  max_tokens=300,
+                                                  documents_collection=t2dm_collection,
+                                                  pinecone_index=pinecone_index
+                                                  )
+        rationale_breakdown = eligibility_agent.process_rationale(trial_rationale=documents_search_keys["rationale"])
+        eligibility_criteria = eligibility_agent.draft_eligibility_criteria(sample_trial_rationale=documents_search_keys["rationale"],
+                                                                queries_list=rationale_breakdown["data"])
+        filtered_inclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["inclusionCriteria"],
+                                                                                    documents_search_keys["rationale"])
+        filtered_exclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["exclusionCriteria"],
+                                                                        documents_search_keys["rationale"])
+        model_generated_eligibility_criteria = {
+            "inclusionCriteria": filtered_inclusion_criteria,
+            "exclusionCriteria": filtered_exclusion_criteria,
+        }
+
+        # Sort trial based on score
+        trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["similarity_score"], reverse=True)
+
+        final_response["data"] = trial_documents
+        final_response["success"] = True
+        final_response["message"] = "Successfully fetched similar documents extended."
+        final_response["eligibilityCriteria"] = model_generated_eligibility_criteria
         return final_response
 
     except Exception as e:
