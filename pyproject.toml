@@ -17,6 +17,7 @@ openai = "^1.59.6"
 numpy = "^2.2.1"
 pinecone-client = "^5.0.1"
 transformers = "^4.48.0"
+scikit-learn = "^1.6.1"
 
 
 [build-system]
