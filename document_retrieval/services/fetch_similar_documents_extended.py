@@ -1,7 +1,7 @@
 from providers.openai.generate_embeddings import validate_document_similarity
 from providers.pinecone.similarity_search_service import query_pinecone_db_extended, pinecone_index
 from providers.openai.generate_embeddings import azure_client
-from database.document_retrieval.fetch_processed_trial_document_with_nct_id import t2dm_collection
+from database.document_retrieval.fetch_processed_trial_document_with_nct_id import t2dm_collection, fetch_processed_trial_document_with_nct_id
 from document_retrieval.utils.fetch_trial_filters import fetch_trial_filters
 from document_retrieval.utils.calculate_weighted_similarity_score import process_similarity_scores
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
@@ -37,7 +37,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
 
             # generate a final data list
             final_list = [
-                {"nctId": nctId, "similarity_score": score, "module": module} for nctId, score in validity_score.items() if score >= 90
+                {"nctId": nctId, "similarity_score": score, "module": module} for nctId, score in validity_score.items() if score >= 85
             ]
 
             return final_list
@@ -101,19 +101,21 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
                                                   documents_collection=t2dm_collection,
                                                   pinecone_index=pinecone_index
                                                   )
-        rationale_breakdown = eligibility_agent.process_rationale(trial_rationale=documents_search_keys["rationale"])
+        # Similar trial documents
+        similar_documents = [fetch_processed_trial_document_with_nct_id(nct_id=item["nctId"])["data"] for item in trial_documents ]
         eligibility_criteria = eligibility_agent.draft_eligibility_criteria(sample_trial_rationale=documents_search_keys["rationale"],
-                                                                queries_list=rationale_breakdown["data"])
-        filtered_inclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["inclusionCriteria"],
-                                                                                    documents_search_keys["rationale"])
-        filtered_exclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["exclusionCriteria"],
-                                                                        documents_search_keys["rationale"])
+                                                                            similar_trial_documents=similar_documents)
+        # filtered_inclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["inclusionCriteria"],
+        #                                                                             documents_search_keys["rationale"])
+        # filtered_exclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["exclusionCriteria"],
+        #                                                                 documents_search_keys["rationale"])
         model_generated_eligibility_criteria = {
-            "inclusionCriteria": filtered_inclusion_criteria,
-            "exclusionCriteria": filtered_exclusion_criteria,
+            "inclusionCriteria": [item["criteria"] for item in eligibility_criteria["inclusionCriteria"]],
+            "exclusionCriteria": [item["criteria"] for item in eligibility_criteria["exclusionCriteria"]],
         }
 
         # Sort trial based on score
+        trial_documents = [item for item in trial_documents if item["similarity_score"] >= 90]
         trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["similarity_score"], reverse=True)
 
         final_response["data"] = trial_documents
