@@ -53,12 +53,14 @@ class TrialEligibilityAgent:
 
         self.medical_writer_agent_role = (
             """
-            You are a Medical Trial Eligibility Criteria Writer Agent. Your primary responsibility is to draft comprehensive Inclusion and Exclusion Criteria for a medical trial based on the provided inputs.
+            You are a Medical Trial Eligibility Criteria Writer Agent. 
+            Your primary responsibility is to draft comprehensive Inclusion and Exclusion Criteria for a medical trial based on the provided inputs.
 
             ### Inputs:
             1. **Medical Trial Rationale**: The overall rationale for the medical trial.
-            2. **Specific Section of Rationale**: A targeted part of the rationale for which you need to write the eligibility criteria.
-            3. **Similar/Existing Medical Trial Document**: Reference documents from similar or related trials to guide your criteria creation.
+            2. **Similar/Existing Medical Trial Document**: Reference documents from similar or related trials to guide your criteria creation.
+            Use the provided similar documents to write a accurate medical trial eligibility criteria.
+            
 
             ### Task:
             Using the provided inputs:
@@ -249,14 +251,13 @@ class TrialEligibilityAgent:
 
         return final_response
 
-    def draft_eligibility_criteria(self, sample_trial_rationale, queries_list):
+    def draft_eligibility_criteria(self, sample_trial_rationale, similar_trial_documents):
         """
         Drafts comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
 
         Parameters:
             sample_trial_rationale (str): The overall rationale for the medical trial.
-            queries_list (list): A list of specific rationale queries.
-            query_pinecone_db (function): Function to fetch similar documents from a database.
+            similar_trial_documents (list): A list of similar documents from a database.
 
         Returns:
             dict: A dictionary containing inclusion and exclusion criteria.
@@ -264,25 +265,17 @@ class TrialEligibilityAgent:
         inclusion_criteria = []
         exclusion_criteria = []
 
-        for query in queries_list:
-            # Fetch similar documents
-            documents_response = self.query_pinecone_db(query=query)
-            if not documents_response["success"]:
-                continue
-
-            documents = documents_response["data"]
-            user_input = f"""
+        user_input = f"""
             Medical Trial Rationale: {sample_trial_rationale}
-            Specific Section of Rationale: {query}
-            Similar/Existing Medical Trial Document: {documents}
-            """
+            Similar/Existing Medical Trial Document: {similar_trial_documents}
+        """
 
-            message_list = [
+        message_list = [
                 {"role": "system", "content": self.medical_writer_agent_role},
                 {"role": "user", "content": user_input}
-            ]
+        ]
 
-            try:
+        try:
                 response = self.azure_client.chat.completions.create(
                     model=self.model,
                     response_format={"type": "json_object"},
@@ -296,8 +289,8 @@ class TrialEligibilityAgent:
                 inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
                 exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
 
-            except Exception as e:
-                print(f"Error processing query '{query}': {e}")
+        except Exception as e:
+            print(f"Error processing query rationale: {e}")
 
         return {
             "inclusionCriteria": inclusion_criteria,
