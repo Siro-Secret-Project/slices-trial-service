@@ -11,3 +11,10 @@ class BaseResponse(BaseModel):
     data: Any
     message: str
     status_code: int
+
+class SearchDocuments(BaseModel):
+    inclusionCriteria: str
+    exclusionCriteria: str
+    rationale: str
+    objective: str
+    efficacyEndpoints: str
