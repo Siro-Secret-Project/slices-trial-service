@@ -102,7 +102,12 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
                                                   pinecone_index=pinecone_index
                                                   )
         # Similar trial documents
-        similar_documents = [fetch_processed_trial_document_with_nct_id(nct_id=item["nctId"])["data"] for item in trial_documents ]
+        similar_documents = []
+        for item in trial_documents:
+            doc = fetch_processed_trial_document_with_nct_id(nct_id=item["nctId"])["data"]
+            similarity_score = item["similarity_score"]
+            similar_documents.append({"nctId": item["nctId"], "similarity_score": similarity_score, "document": doc})
+
         eligibility_criteria = eligibility_agent.draft_eligibility_criteria(sample_trial_rationale=documents_search_keys["rationale"],
                                                                             similar_trial_documents=similar_documents)
         # filtered_inclusion_criteria = eligibility_agent.filter_eligibility_criteria(eligibility_criteria["inclusionCriteria"],

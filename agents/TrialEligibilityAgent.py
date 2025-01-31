@@ -87,6 +87,7 @@ class TrialEligibilityAgent:
             }
 
             ### Notes:
+            - Always Ensure similarity scores (How similar are document to the trial rationales) when writing the Criteria.
             - Ensure the criteria are evidence-based and align with the trial rationale.
             - Reference similar trials (NCT IDs) to justify each criterion.
             - The reasoning should be concise, logical, and directly tied to the provided inputs.

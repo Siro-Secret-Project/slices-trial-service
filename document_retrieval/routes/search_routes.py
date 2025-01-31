@@ -1,8 +1,7 @@
-from fastapi import APIRouter,Response, status, Request
+from fastapi import APIRouter,Response, status
 from document_retrieval.models.models import SearchResult, BaseResponse, SearchDocuments
 from document_retrieval.services.fetch_documents_service import fetch_documents_service
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
-from document_retrieval.utils.calculate_weighted_similarity_score import calculate_weighted_similarity_score
 
 router = APIRouter()
 
