@@ -1,6 +1,8 @@
 import json
 from collections import defaultdict
 import numpy as np
+from Tools.scripts.summarize_stats import categorized_counts
+
 
 class TrialEligibilityAgent:
     def __init__(self, azure_client, pinecone_index, documents_collection, model="model-4o", max_tokens=500, temperature=0.2):
@@ -19,49 +21,16 @@ class TrialEligibilityAgent:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.pinecone_index = pinecone_index
-        self.query_breakdown_agent_role = (
-            """
-            You are an AI assistant specialized in processing medical trial rationales.
-            Your task is to break down a provided trial rationale into small, logically structured, and independent rationales. 
-            Each rationale should be self-contained, contextually relevant, and designed to help query a database like Pinecone to find related documents.
-            You have to divide in max 4 sub trial rationale
 
-            ### Input:
-            You will be provided with a medical trial rationale.
-
-            ### Task:
-            1. Parse the rationale into meaningful, independent rationales.
-            2. Ensure each rationale is concise, self-contained, and contextually accurate.
-
-            ### Output Format:
-            The response should be structured as follows:
-
-            json_object = {
-              "response": [
-                "independent rationale 1",
-                "independent rationale 2",
-                "independent rationale 3",
-                ...
-              ]
-            }
-
-            ### Notes:
-            - Each rationale should be self-sufficient and formatted to allow precise database searching.
-            - Avoid redundancy in the rationales and focus on capturing distinct key points from the provided rationale.
-            """
-        )
-
-        self.medical_writer_agent_role = (
+        self.categorisation_role = (
             """
             Medical Trial Eligibility Criteria Writer Agent
     
             Objective:
-                Your primary task is to draft Inclusion and Exclusion Criteria for a medical trial based on the provided information.
+                Your primary task is to categorise the provided eligibility criteria into to provided 14 classes.
     
             Inputs:
-                1. Medical Trial Rationale: The purpose and objectives of the medical trial.
-                2. Reference Medical Trials: Documents from similar or past trials to guide the eligibility criteria formulation.
-                3. User provided inclusion and exclusion criteria.
+                1. List of eligibility criteria.
     
             Task:
                 Using the provided inputs:
@@ -69,7 +38,7 @@ class TrialEligibilityAgent:
                     - Age
                     - Gender
                     - Health Condition/Status
-                    - Clinical and Laboratory Parameters
+                    - Clinical and Laboratory Parameters - (provide HbA1c in this category)
                     - Medication Status
                     - Informed Consent
                     - Ability to Comply with Study Procedures
@@ -107,77 +76,54 @@ class TrialEligibilityAgent:
                 }
     
             Guidelines:
-                - Ensure accuracy and relevance by comparing similarity scores between the trial rationale and reference documents.
-                - Base criteria on evidence and align them with the trial's purpose.
-                - Use correct lab values and justify their inclusion.
-                - Reference similar trials (NCT IDs) to support the reasoning for each criterion.
                 - Maintain clarity, logic, and conciseness in explanations.
+                - HbA1c levels will come in Clinical and Laboratory Parameters
             """
 
         )
-        self.filter_role = """
-              You are tasked with refining a list of Eligibility Criteria for a medical trial. Along with the criteria, you will also be provided with the trial rationale.
-
-              ### Objective:
-              - Remove redundant or repetitive criteria from the provided list.
-              - Return a clean and filtered list of eligibility criteria.
-
-              ### Response Format:
-              json_object
-              {
-                "response": [
-                  "criteria1",
-                  "criteria2"
-                ]
-              }
+        self.medical_writer_agent_role = (
             """
+            You are a Medical Trial Eligibility Criteria Writer Agent. 
+            Your primary responsibility is to draft comprehensive Inclusion and Exclusion Criteria for a medical trial based on the provided inputs.
 
-    def process_rationale(self, trial_rationale):
-        """
-        Breaks down a medical trial rationale into smaller, logical queries using an AI model.
+            ### Inputs:
+            1. **Medical Trial Rationale**: The overall rationale for the medical trial.
+            2. **Similar/Existing Medical Trial Document**: Reference documents from similar or related trials to guide your criteria creation.
+            Use the provided similar documents to write a accurate medical trial eligibility criteria.
+            
 
-        Parameters:
-            trial_rationale (str): The input trial rationale text to be processed.
+            ### Task:
+            Using the provided inputs:
+            1. Write clear and precise **Inclusion Criteria** and **Exclusion Criteria** for the medical trial.
+            2. For each criterion, provide the following:
+               - **Criteria**: The specific inclusion or exclusion statement.
+               - **Reasoning**: An explanation for why the criterion is included, referencing the source of reasoning (e.g., NCT IDs).
 
-        Returns:
-            dict: A dictionary containing the success status, message, and the processed data or error details.
-        """
-        final_response = {
-            "success": False,
-            "message": "",
-            "data": None
-        }
+            ### Response Format:
+            json_object
+            {
+              "inclusionCriteria": [
+                {
+                  "criteria": "string",
+                  "reasoning": "string"
+                }
+              ],
+              "exclusionCriteria": [
+                {
+                  "criteria": "string",
+                  "reasoning": "string"
+                }
+              ]
+            }
 
-        try:
-            # Prepare the chat history with the system and user roles
-            chat_history = [
-                {"role": "system", "content": self.query_breakdown_agent_role},
-                {"role": "user", "content": trial_rationale}
-            ]
-
-            # Call the Azure client to get the response
-            response = self.azure_client.chat.completions.create(
-                model=self.model,
-                response_format={"type": "json_object"},
-                messages=chat_history,
-                stream=False,
-                max_tokens=self.max_tokens,
-                temperature=self.temperature
-            )
-
-            # Parse the AI response into JSON
-            str_response = response.choices[0].message.content
-            json_response = json.loads(str_response)
-
-            # Update the final response with success data
-            final_response["data"] = json_response["response"]
-            final_response["success"] = True
-            final_response["message"] = "Successfully broken down rationale"
-        except Exception as e:
-            # Handle exceptions and update the final response with the error message
-            final_response["message"] = str(e)
-
-        return final_response
+            ### Notes:
+            - Always Ensure similarity scores (How similar are document to the trial rationales) when writing the Criteria.
+            - Ensure the criteria are evidence-based and align with the trial rationale.
+            - Reference similar trials (NCT IDs) to justify each criterion.
+            - The reasoning should be concise, logical, and directly tied to the provided inputs.
+            - Ensure the correct Lab values. And also include reason for lab values in reasoning.
+            """
+        )
 
     def generate_embeddings_from_azure_client(self, text):
         try:
@@ -324,6 +270,7 @@ class TrialEligibilityAgent:
                     inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
                     exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
 
+
             except Exception as e:
                 print(f"Error processing query rationale: {e}")
 
@@ -339,41 +286,64 @@ class TrialEligibilityAgent:
             final_response["message"] = f"Error processing query rationale: {e}"
             return final_response
 
-
-    def filter_eligibility_criteria(self, inclusion_criteria, trial_rationale):
+    def categorise_eligibility_criteria(self, eligibility_criteria):
         """
-        Filters the eligibility criteria based on trial rationale by calling an AI model.
+        Categorise comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
 
         Parameters:
-            inclusion_criteria (list): A list of inclusion criteria for the trial.
-            trial_rationale (str): The rationale for the trial.
+            eligibility_criteria: Eligibility criteria for medical trial.
 
         Returns:
-            list: A filtered list of eligibility criteria.
+            dict: A dictionary containing inclusion and exclusion criteria.
         """
+        final_response = {
+            "success": False,
+            "message": "failed to draft eligibility criteria",
+            "data": None
+        }
+        try:
+            inclusion_criteria = []
+            exclusion_criteria = []
 
-        # Format the inclusion criteria list
-        inclusion_criteria_list = [item["criteria"] for item in inclusion_criteria]
+            user_input = f"""
+                Medical Trial Eligibility Criteria: {eligibility_criteria}
+            """
 
-        message_list = [
-            {"role": "system", "content": self.filter_role},
-            {"role": "user", "content": f"Eligibility Criteria: {inclusion_criteria_list}, trial rationale: {trial_rationale}"},
-        ]
+            message_list = [
+                    {"role": "system", "content": self.categorisation_role},
+                    {"role": "user", "content": user_input}
+            ]
 
-        # Make the API call to get the filtered criteria
-        response = self.azure_client.chat.completions.create(
-            model=self.model,
-            response_format={"type": "json_object"},
-            messages=message_list,
-            stream=False,
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-        )
+            try:
+                    response = self.azure_client.chat.completions.create(
+                        model=self.model,
+                        response_format={"type": "json_object"},
+                        messages=message_list,
+                        stream=False,
+                        max_tokens=3000,
+                        temperature=self.temperature
+                    )
 
-        # Parse and return the filtered criteria from the response
-        inclusion_criteria_filtered = json.loads(response.choices[0].message.content)['response']
+                    json_response = json.loads(response.choices[0].message.content)
+                    inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
+                    exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
 
-        return inclusion_criteria_filtered
+
+            except Exception as e:
+                print(f"Error processing query rationale: {e}")
+
+            final_data = {
+                "inclusionCriteria": inclusion_criteria,
+                "exclusionCriteria": exclusion_criteria
+            }
+            final_response["data"] = final_data
+            final_response["success"] = True
+            final_response["message"] = "Successfully draft eligibility criteria"
+            return final_response
+        except Exception as e:
+            final_response["message"] = f"Error processing query rationale: {e}"
+            return final_response
+
 
     def fetch_mongo_document(self, nct_id: str, module: str = None) -> dict:
         final_response = {

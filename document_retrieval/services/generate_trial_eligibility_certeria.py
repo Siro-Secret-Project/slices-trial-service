@@ -1,3 +1,5 @@
+from Tools.scripts.summarize_stats import categorized_counts
+
 from providers.pinecone.similarity_search_service import pinecone_index
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
@@ -88,25 +90,51 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             "exclusionCriteria": [item["criteria"] for item in eligibility_criteria["exclusionCriteria"]],
         }
 
+        # Categorise response
+        categorized_agent_response = eligibility_agent.categorise_eligibility_criteria(eligibility_criteria=eligibility_criteria)
+        if categorized_agent_response["success"] is False:
+            final_response["message"] = categorized_agent_response["message"]
+            return final_response
+
+
         # Categorize the data
         categorizedData = {}
-        for item in eligibility_criteria_response["data"]["inclusionCriteria"]:
+        for item in categorized_agent_response["data"]["inclusionCriteria"]:
             item_class = item["class"]
             categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
             categorizedData[item_class]["Inclusion"].append(criteria)
 
-        for item in eligibility_criteria_response["data"]["exclusionCriteria"]:
+        for item in categorized_agent_response["data"]["exclusionCriteria"]:
             item_class = item["class"]
             categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
             categorizedData[item_class]["Exclusion"].append(criteria)
 
+        # Categorize user data
+        categorized_user_data = eligibility_agent.categorise_eligibility_criteria(eligibility_criteria=f"Inclusion: {inclusion_criteria}, Exclusion: {exclusion_criteria}")
+        # Categorize the data
+        categorizedDataUser = {}
+        for item in categorized_user_data["data"]["inclusionCriteria"]:
+            item_class = item["class"]
+            categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
+            criteria = item["criteria"]
+            categorizedDataUser[item_class]["Inclusion"].append(criteria)
+
+        for item in categorized_user_data["data"]["exclusionCriteria"]:
+            item_class = item["class"]
+            categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
+            criteria = item["criteria"]
+            categorizedDataUser[item_class]["Exclusion"].append(criteria)
+
+
+
         # Store Job in DB
         db_response = record_eligibility_criteria_job(job_id=ecid,
                                                       trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
                                                       trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
-                                                      categorized_data=categorizedData)
+                                                      categorized_data=categorizedData,
+                                                      categorized_data_user=categorized_user_data["data"])
         if db_response["success"] is True:
             final_response["message"] = db_response["message"]
         else:
@@ -114,6 +142,7 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
 
         # Add Categorized Data in final response
         model_generated_eligibility_criteria["categorizedData"] = categorizedData
+        model_generated_eligibility_criteria["userCategorizedData"] = categorizedDataUser
 
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria

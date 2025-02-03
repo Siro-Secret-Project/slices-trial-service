@@ -8,3 +8,4 @@ class StoreEligibilityCriteria(BaseModel):
     created_at: datetime
     updated_at: datetime
     categorizedData: dict
+    userCategorizedData: dict
