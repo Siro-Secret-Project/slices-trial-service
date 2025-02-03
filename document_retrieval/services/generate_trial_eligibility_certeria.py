@@ -1,5 +1,3 @@
-from Tools.scripts.summarize_stats import categorized_counts
-
 from providers.pinecone.similarity_search_service import pinecone_index
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
