@@ -36,6 +36,10 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
     try:
         # Fetch similar trial documents using the provided search keys
         trial_documents_response = await fetch_similar_documents_extended(documents_search_keys=documents_search_keys)
+        inclusion_criteria = documents_search_keys["inclusion_criteria"]
+        inclusion_criteria = inclusion_criteria if inclusion_criteria is not None else "No inclusion criteria provided"
+        exclusion_criteria = documents_search_keys["exclusion_criteria"]
+        exclusion_criteria = exclusion_criteria if exclusion_criteria is not None else "No exclusion criteria provided"
 
         # Check if fetching similar documents was unsuccessful
         if trial_documents_response["success"] is False:
@@ -66,10 +70,17 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             })
 
         # Generate eligibility criteria using the eligibility agent
-        eligibility_criteria = eligibility_agent.draft_eligibility_criteria(
+        eligibility_criteria_response = eligibility_agent.draft_eligibility_criteria(
             sample_trial_rationale=documents_search_keys["rationale"],
-            similar_trial_documents=similar_documents
+            similar_trial_documents=similar_documents,
+            user_provided_inclusion_criteria=inclusion_criteria,
+            user_provided_exclusion_criteria=exclusion_criteria,
         )
+        if eligibility_criteria_response["success"] is False:
+            final_response["message"] = eligibility_criteria_response["message"]
+            return final_response
+
+        eligibility_criteria = eligibility_criteria_response["data"]
 
         # Format the generated eligibility criteria
         model_generated_eligibility_criteria = {
@@ -77,14 +88,32 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             "exclusionCriteria": [item["criteria"] for item in eligibility_criteria["exclusionCriteria"]],
         }
 
+        # Categorize the data
+        categorizedData = {}
+        for item in eligibility_criteria_response["data"]["inclusionCriteria"]:
+            item_class = item["class"]
+            categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
+            criteria = item["criteria"]
+            categorizedData[item_class]["Inclusion"].append(criteria)
+
+        for item in eligibility_criteria_response["data"]["exclusionCriteria"]:
+            item_class = item["class"]
+            categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
+            criteria = item["criteria"]
+            categorizedData[item_class]["Exclusion"].append(criteria)
+
         # Store Job in DB
         db_response = record_eligibility_criteria_job(job_id=ecid,
                                                       trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
-                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"])
+                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
+                                                      categorized_data=categorizedData)
         if db_response["success"] is True:
             final_response["message"] = db_response["message"]
         else:
             final_response["message"] = "Successfully generated trial eligibility criteria." + db_response["message"]
+
+        # Add Categorized Data in final response
+        model_generated_eligibility_criteria["categorizedData"] = categorizedData
 
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria

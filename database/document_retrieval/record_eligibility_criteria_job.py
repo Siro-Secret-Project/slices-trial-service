@@ -5,7 +5,10 @@ from document_retrieval.models.db_models import StoreEligibilityCriteria
 # Collection to store the job in MongoDB
 similar_trials_criteria_results_collection = db['similar_trials_criteria_results']
 
-def record_eligibility_criteria_job(job_id: str, trial_inclusion_criteria: list, trial_exclusion_criteria: list) -> dict:
+def record_eligibility_criteria_job(job_id: str,
+                                    trial_inclusion_criteria: list,
+                                    trial_exclusion_criteria: list,
+                                    categorized_data: dict) -> dict:
     """
     Stores the generated eligibility criteria (inclusion and exclusion) as a job in MongoDB.
 
@@ -22,6 +25,7 @@ def record_eligibility_criteria_job(job_id: str, trial_inclusion_criteria: list,
               - success (bool): Indicates whether the operation was successful.
               - message (str): A message describing the outcome of the operation.
               - data (str or None): The ID of the inserted document if successful, otherwise None.
+              - categorized_data (dict): The categories from which each criteria belongs.
     """
     # Initialize the final response structure
     final_response = {
@@ -38,6 +42,7 @@ def record_eligibility_criteria_job(job_id: str, trial_inclusion_criteria: list,
             exclusion_criteria=trial_exclusion_criteria,
             created_at=datetime.now(),  # Timestamp for when the document is created
             updated_at=datetime.now(),  # Timestamp for when the document is last updated
+            categorizedData=categorized_data
         )
 
         # Insert the document into the MongoDB collection

@@ -53,46 +53,67 @@ class TrialEligibilityAgent:
 
         self.medical_writer_agent_role = (
             """
-            You are a Medical Trial Eligibility Criteria Writer Agent. 
-            Your primary responsibility is to draft comprehensive Inclusion and Exclusion Criteria for a medical trial based on the provided inputs.
-
-            ### Inputs:
-            1. **Medical Trial Rationale**: The overall rationale for the medical trial.
-            2. **Similar/Existing Medical Trial Document**: Reference documents from similar or related trials to guide your criteria creation.
-            Use the provided similar documents to write a accurate medical trial eligibility criteria.
-            
-
-            ### Task:
-            Using the provided inputs:
-            1. Write clear and precise **Inclusion Criteria** and **Exclusion Criteria** for the medical trial.
-            2. For each criterion, provide the following:
-               - **Criteria**: The specific inclusion or exclusion statement.
-               - **Reasoning**: An explanation for why the criterion is included, referencing the source of reasoning (e.g., NCT IDs).
-
-            ### Response Format:
-            json_object
-            {
-              "inclusionCriteria": [
+            Medical Trial Eligibility Criteria Writer Agent
+    
+            Objective:
+                Your primary task is to draft Inclusion and Exclusion Criteria for a medical trial based on the provided information.
+    
+            Inputs:
+                1. Medical Trial Rationale: The purpose and objectives of the medical trial.
+                2. Reference Medical Trials: Documents from similar or past trials to guide the eligibility criteria formulation.
+                3. User provided inclusion and exclusion criteria.
+    
+            Task:
+                Using the provided inputs:
+                1. Define Inclusion Criteria and Exclusion Criteria based on the following 14 key factors:
+                    - Age
+                    - Gender
+                    - Health Condition/Status
+                    - Clinical and Laboratory Parameters
+                    - Medication Status
+                    - Informed Consent
+                    - Ability to Comply with Study Procedures
+                    - Lifestyle Requirements
+                    - Reproductive Status
+                    - Co-morbid Conditions
+                    - Recent Participation in Other Clinical Trials
+                    - Allergies and Drug Reactions
+                    - Mental Health Disorders
+                    - Infectious Diseases
+                    - Other (if applicable)
+    
+                2. For each criterion, provide:
+                    - Criteria: A precise inclusion or exclusion statement.
+                    - Reasoning: A brief explanation, referencing similar trials (NCT IDs) when applicable.
+                    - Class: The specific category from the 14 key factors above.
+    
+            Response Format:
+                json_object:
                 {
-                  "criteria": "string",
-                  "reasoning": "string"
+                    "inclusionCriteria": [
+                        {
+                            "criteria": "string",
+                            "reasoning": "string",
+                            "class": "string"
+                        }
+                    ],
+                    "exclusionCriteria": [
+                        {
+                            "criteria": "string",
+                            "reasoning": "string",
+                            "class": "string"
+                        }
+                    ]
                 }
-              ],
-              "exclusionCriteria": [
-                {
-                  "criteria": "string",
-                  "reasoning": "string"
-                }
-              ]
-            }
-
-            ### Notes:
-            - Always Ensure similarity scores (How similar are document to the trial rationales) when writing the Criteria.
-            - Ensure the criteria are evidence-based and align with the trial rationale.
-            - Reference similar trials (NCT IDs) to justify each criterion.
-            - The reasoning should be concise, logical, and directly tied to the provided inputs.
-            - Ensure the correct Lab values. And also include reason for lab values in reasoning.
+    
+            Guidelines:
+                - Ensure accuracy and relevance by comparing similarity scores between the trial rationale and reference documents.
+                - Base criteria on evidence and align them with the trial's purpose.
+                - Use correct lab values and justify their inclusion.
+                - Reference similar trials (NCT IDs) to support the reasoning for each criterion.
+                - Maintain clarity, logic, and conciseness in explanations.
             """
+
         )
         self.filter_role = """
               You are tasked with refining a list of Eligibility Criteria for a medical trial. Along with the criteria, you will also be provided with the trial rationale.
@@ -252,51 +273,72 @@ class TrialEligibilityAgent:
 
         return final_response
 
-    def draft_eligibility_criteria(self, sample_trial_rationale, similar_trial_documents):
+    def draft_eligibility_criteria(self, sample_trial_rationale,
+                                   similar_trial_documents,
+                                   user_provided_inclusion_criteria,
+                                   user_provided_exclusion_criteria):
         """
         Drafts comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
 
         Parameters:
             sample_trial_rationale (str): The overall rationale for the medical trial.
             similar_trial_documents (list): A list of similar documents from a database.
+            user_provided_inclusion_criteria (str): The user provided inclusion criteria.
+            user_provided_exclusion_criteria (str): The user provided exclusion criteria.
 
         Returns:
             dict: A dictionary containing inclusion and exclusion criteria.
         """
-        inclusion_criteria = []
-        exclusion_criteria = []
-
-        user_input = f"""
-            Medical Trial Rationale: {sample_trial_rationale}
-            Similar/Existing Medical Trial Document: {similar_trial_documents}
-        """
-
-        message_list = [
-                {"role": "system", "content": self.medical_writer_agent_role},
-                {"role": "user", "content": user_input}
-        ]
-
-        try:
-                response = self.azure_client.chat.completions.create(
-                    model=self.model,
-                    response_format={"type": "json_object"},
-                    messages=message_list,
-                    stream=False,
-                    max_tokens=3000,
-                    temperature=self.temperature
-                )
-
-                json_response = json.loads(response.choices[0].message.content)
-                inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
-                exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
-
-        except Exception as e:
-            print(f"Error processing query rationale: {e}")
-
-        return {
-            "inclusionCriteria": inclusion_criteria,
-            "exclusionCriteria": exclusion_criteria
+        final_response = {
+            "success": False,
+            "message": "failed to draft eligibility criteria",
+            "data": None
         }
+        try:
+            inclusion_criteria = []
+            exclusion_criteria = []
+
+            user_input = f"""
+                Medical Trial Rationale: {sample_trial_rationale}
+                Similar/Existing Medical Trial Document: {similar_trial_documents},
+                User provided: {user_provided_inclusion_criteria},
+                {user_provided_exclusion_criteria}
+            """
+
+            message_list = [
+                    {"role": "system", "content": self.medical_writer_agent_role},
+                    {"role": "user", "content": user_input}
+            ]
+
+            try:
+                    response = self.azure_client.chat.completions.create(
+                        model=self.model,
+                        response_format={"type": "json_object"},
+                        messages=message_list,
+                        stream=False,
+                        max_tokens=3000,
+                        temperature=self.temperature
+                    )
+
+                    json_response = json.loads(response.choices[0].message.content)
+                    inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
+                    exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
+
+            except Exception as e:
+                print(f"Error processing query rationale: {e}")
+
+            final_data = {
+                "inclusionCriteria": inclusion_criteria,
+                "exclusionCriteria": exclusion_criteria
+            }
+            final_response["data"] = final_data
+            final_response["success"] = True
+            final_response["message"] = "Successfully draft eligibility criteria"
+            return final_response
+        except Exception as e:
+            final_response["message"] = f"Error processing query rationale: {e}"
+            return final_response
+
 
     def filter_eligibility_criteria(self, inclusion_criteria, trial_rationale):
         """

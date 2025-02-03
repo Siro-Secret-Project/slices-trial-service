@@ -7,3 +7,4 @@ class StoreEligibilityCriteria(BaseModel):
     exclusion_criteria: list
     created_at: datetime
     updated_at: datetime
+    categorizedData: dict
