@@ -1,48 +1,48 @@
 from fastapi import APIRouter,Response, status
-from document_retrieval.models.models import SearchResult, BaseResponse, SearchDocuments
-from document_retrieval.services.fetch_documents_service import fetch_documents_service
+from document_retrieval.models.routes_models import BaseResponse, SearchDocuments, GenerateEligibilityCriteria
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
+from document_retrieval.services.generate_trial_eligibility_certeria import generate_trial_eligibility_criteria
 
 router = APIRouter()
 
+# @router.post("/search_documents", response_model=BaseResponse)
+# async def search_routes(request: SearchResult, response: Response):
+#     base_response = BaseResponse(
+#         success=False,
+#         status_code=status.HTTP_400_BAD_REQUEST,
+#         data=None,
+#         message="Internal Server Error",
+#     )
+#     try:
+#         input_query = request.search_query
+#         similarity_threshold = request.similarity_threshold
+#         module = request.module
+#
+#         # Fetch similar documents
+#         similar_documents_response = await fetch_documents_service(query=input_query,
+#                                                                    similarity_threshold=similarity_threshold,
+#                                                                    module=module)
+#         if similar_documents_response["success"] is False:
+#             base_response.success = False
+#             base_response.message = similar_documents_response["message"]
+#             response.status_code = status.HTTP_400_BAD_REQUEST
+#             return base_response
+#         else:
+#             base_response.success = True
+#             base_response.message = similar_documents_response["message"]
+#             base_response.status_code = status.HTTP_200_OK
+#             base_response.data = similar_documents_response["data"]
+#             response.status_code = status.HTTP_200_OK
+#             return base_response
+#     except Exception as e:
+#         print(f"Unexpected error: {e}")
+#         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+#         base_response.message = f"Unexpected error: {e}"
+#         base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+#         return base_response
+
+
 @router.post("/search_documents", response_model=BaseResponse)
-async def search_routes(request: SearchResult, response: Response):
-    base_response = BaseResponse(
-        success=False,
-        status_code=status.HTTP_400_BAD_REQUEST,
-        data=None,
-        message="Internal Server Error",
-    )
-    try:
-        input_query = request.search_query
-        similarity_threshold = request.similarity_threshold
-        module = request.module
-
-        # Fetch similar documents
-        similar_documents_response = await fetch_documents_service(query=input_query,
-                                                                   similarity_threshold=similarity_threshold,
-                                                                   module=module)
-        if similar_documents_response["success"] is False:
-            base_response.success = False
-            base_response.message = similar_documents_response["message"]
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return base_response
-        else:
-            base_response.success = True
-            base_response.message = similar_documents_response["message"]
-            base_response.status_code = status.HTTP_200_OK
-            base_response.data = similar_documents_response["data"]
-            response.status_code = status.HTTP_200_OK
-            return base_response
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        base_response.message = f"Unexpected error: {e}"
-        base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return base_response
-
-
-@router.post("/search_documents_new", response_model=BaseResponse)
 async def search_routes_new(request: SearchDocuments, response: Response):
     """
     Endpoint to search for documents based on inclusion criteria, exclusion criteria, and rationale.
@@ -58,8 +58,7 @@ async def search_routes_new(request: SearchDocuments, response: Response):
         success=False,
         status_code=status.HTTP_400_BAD_REQUEST,
         data=None,
-        message="Internal Server Error",
-        eligibilityCriteria={}
+        message="Internal Server Error"
     )
 
     try:
@@ -92,12 +91,91 @@ async def search_routes_new(request: SearchDocuments, response: Response):
             base_response.message = similar_documents_response["message"]
             base_response.status_code = status.HTTP_200_OK
             base_response.data = similar_documents_response["data"]
-            base_response.eligibilityCriteria = similar_documents_response["eligibilityCriteria"]
             response.status_code = status.HTTP_200_OK
             return base_response
 
     except Exception as e:
         # Handle unexpected errors and log them
+        print(f"Unexpected error: {e}")
+        base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        base_response.message = f"Unexpected error: {e}"
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        return base_response
+
+
+@router.post("/generate_trial_eligibility_criteria", response_model=BaseResponse)
+async def generate_trial_eligibility_criteria_route(request: GenerateEligibilityCriteria, response: Response):
+    """
+    API endpoint to generate trial eligibility criteria based on input search parameters.
+
+    This route accepts a request containing search parameters (e.g., inclusion/exclusion criteria,
+    rationale, objective, and trial outcomes) and uses them to fetch and generate trial eligibility
+    criteria. The response includes the generated criteria or an error message if the operation fails.
+
+    Args:
+        request (GenerateEligibilityCriteria): The request object containing search parameters:
+            - inclusionCriteria (str): Inclusion criteria for the trial.
+            - exclusionCriteria (str): Exclusion criteria for the trial.
+            - rationale (str): Rationale for the trial.
+            - objective (str): Objective of the trial.
+            - efficacyEndpoints (str): Efficacy endpoints or trial outcomes.
+        response (Response): The FastAPI response object used to set HTTP status codes.
+
+    Returns:
+        BaseResponse: A response object containing:
+            - success (bool): Indicates whether the operation was successful.
+            - status_code (int): HTTP status code of the response.
+            - data (dict or None): Contains the generated eligibility criteria if successful.
+            - message (str): A message describing the outcome of the operation.
+    """
+    # Initialize the base response structure with default values
+    base_response = BaseResponse(
+        success=False,
+        status_code=status.HTTP_400_BAD_REQUEST,
+        data=None,
+        message="Internal Server Error"
+    )
+
+    try:
+        # Extract and sanitize input criteria from the request
+        inclusion_criteria = request.inclusionCriteria if request.inclusionCriteria != "" else None
+        exclusion_criteria = request.exclusionCriteria if request.exclusionCriteria != "" else None
+        rationale = request.rationale if request.rationale != "" else None
+        objective = request.objective if request.objective != "" else None
+        trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
+        ecid = request.ecid
+
+        # Prepare the input document for fetching similar documents
+        input_document = {
+            "inclusion_criteria": inclusion_criteria,
+            "exclusion_criteria": exclusion_criteria,
+            "rationale": rationale,
+            "objective": objective,
+            "trial_outcomes": trial_outcomes,
+        }
+
+        # Fetch and generate trial eligibility criteria using the input document
+        similar_documents_response = await generate_trial_eligibility_criteria(documents_search_keys=input_document,
+                                                                               ecid=ecid)
+
+        # Handle the response from the eligibility criteria generation function
+        if similar_documents_response["success"] is False:
+            # If the operation fails, update the base response with the error message
+            base_response.success = False
+            base_response.message = similar_documents_response["message"]
+            response.status_code = status.HTTP_400_BAD_REQUEST
+            return base_response
+        else:
+            # If the operation succeeds, update the base response with the generated criteria
+            base_response.success = True
+            base_response.message = similar_documents_response["message"]
+            base_response.status_code = status.HTTP_200_OK
+            base_response.data = similar_documents_response["data"]
+            response.status_code = status.HTTP_200_OK
+            return base_response
+
+    except Exception as e:
+        # Handle unexpected errors, log them, and update the base response
         print(f"Unexpected error: {e}")
         base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         base_response.message = f"Unexpected error: {e}"

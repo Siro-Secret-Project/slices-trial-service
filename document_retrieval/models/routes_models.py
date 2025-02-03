@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 from pydantic import BaseModel
 
 class SearchResult(BaseModel):
@@ -11,7 +11,6 @@ class BaseResponse(BaseModel):
     data: Any
     message: str
     status_code: int
-    eligibilityCriteria: Optional[dict]
 
 class SearchDocuments(BaseModel):
     inclusionCriteria: str
@@ -19,3 +18,6 @@ class SearchDocuments(BaseModel):
     rationale: str
     objective: str
     efficacyEndpoints: str
+
+class GenerateEligibilityCriteria(SearchDocuments):
+    ecid: str
