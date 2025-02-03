@@ -105,7 +105,9 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
 
         for item in categorized_agent_response["data"]["exclusionCriteria"]:
             item_class = item["class"]
-            categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
+            test = categorizedData.get(item_class, None)
+            if test is None:
+                categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
             categorizedData[item_class]["Exclusion"].append(criteria)
 
@@ -121,7 +123,9 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
 
         for item in categorized_user_data["data"]["exclusionCriteria"]:
             item_class = item["class"]
-            categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
+            test = categorizedDataUser.get(item_class, None)
+            if test is None:
+                categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
             categorizedDataUser[item_class]["Exclusion"].append(criteria)
 
