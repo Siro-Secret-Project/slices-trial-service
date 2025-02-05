@@ -36,9 +36,9 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
     try:
         # Fetch similar trial documents using the provided search keys
         trial_documents_response = await fetch_similar_documents_extended(documents_search_keys=documents_search_keys)
-        inclusion_criteria = documents_search_keys["inclusion_criteria"]
+        inclusion_criteria = documents_search_keys["inclusionCriteria"]
         inclusion_criteria = inclusion_criteria if inclusion_criteria is not None else "No inclusion criteria provided"
-        exclusion_criteria = documents_search_keys["exclusion_criteria"]
+        exclusion_criteria = documents_search_keys["exclusionCriteria"]
         exclusion_criteria = exclusion_criteria if exclusion_criteria is not None else "No exclusion criteria provided"
 
         # Check if fetching similar documents was unsuccessful
@@ -114,20 +114,20 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
         # Categorize user data
         categorized_user_data = eligibility_agent.categorise_eligibility_criteria(eligibility_criteria=f"Inclusion: {inclusion_criteria}, Exclusion: {exclusion_criteria}")
         # Categorize the data
-        categorizedDataUser = {}
+        categorized_data_user = {}
         for item in categorized_user_data["data"]["inclusionCriteria"]:
             item_class = item["class"]
-            categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
+            categorized_data_user[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
-            categorizedDataUser[item_class]["Inclusion"].append(criteria)
+            categorized_data_user[item_class]["Inclusion"].append(criteria)
 
         for item in categorized_user_data["data"]["exclusionCriteria"]:
             item_class = item["class"]
-            test = categorizedDataUser.get(item_class, None)
+            test = categorized_data_user.get(item_class, None)
             if test is None:
-                categorizedDataUser[item_class] = {"Inclusion": [], "Exclusion": []}
+                categorized_data_user[item_class] = {"Inclusion": [], "Exclusion": []}
             criteria = item["criteria"]
-            categorizedDataUser[item_class]["Exclusion"].append(criteria)
+            categorized_data_user[item_class]["Exclusion"].append(criteria)
 
 
 
@@ -136,7 +136,8 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
                                                       trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
                                                       trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
                                                       categorized_data=categorizedData,
-                                                      categorized_data_user=categorized_user_data["data"])
+                                                      categorized_data_user=categorized_user_data["data"],
+                                                      trial_documents=trial_documents)
         if db_response["success"] is True:
             final_response["message"] = db_response["message"]
         else:
@@ -144,7 +145,8 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
 
         # Add Categorized Data in final response
         model_generated_eligibility_criteria["categorizedData"] = categorizedData
-        model_generated_eligibility_criteria["userCategorizedData"] = categorizedDataUser
+        model_generated_eligibility_criteria["userCategorizedData"] = categorized_data_user
+        model_generated_eligibility_criteria["trial_documents"] = trial_documents
 
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria

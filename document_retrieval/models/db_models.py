@@ -9,3 +9,4 @@ class StoreEligibilityCriteria(BaseModel):
     updated_at: datetime
     categorizedData: dict
     userCategorizedData: dict
+    trailDocuments: list

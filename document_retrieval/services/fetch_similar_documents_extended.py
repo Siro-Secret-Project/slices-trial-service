@@ -1,5 +1,15 @@
 from document_retrieval.utils.process_criteria import process_criteria
 from document_retrieval.utils.fetch_trial_filters import fetch_trial_filters
+from document_retrieval.utils.calculate_weighted_similarity_score import process_similarity_scores
+
+# Defaults weights
+default_weights = {
+    "inclusionCriteria": 0.2,
+    "exclusionCriteria": 0.2,
+    "objective": 0.2,
+    "rationale": 0.2,
+    "trialOutcomes": 0.2
+}
 
 
 async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
@@ -16,10 +26,10 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
     try:
         # Process each criteria and store the results
         inclusion_criteria_documents = process_criteria(
-            documents_search_keys.get("inclusion_criteria"), module="eligibilityModule"
+            documents_search_keys.get("inclusionCriteria"), module="eligibilityModule"
         )
         exclusion_criteria_documents = process_criteria(
-            documents_search_keys.get("exclusion_criteria"), module="eligibilityModule"
+            documents_search_keys.get("exclusionCriteria"), module="eligibilityModule"
         )
         trial_rationale_documents = process_criteria(
             documents_search_keys.get("rationale")
@@ -32,7 +42,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
         )
 
         trial_outcomes_documents = process_criteria(
-            documents_search_keys.get("trial_outcomes"), module="outcomesModule"
+            documents_search_keys.get("trialOutcomes"), module="outcomesModule"
         )
         # Combine all documents and ensure uniqueness by retaining the highest similarity score
         combined_documents = (
@@ -56,16 +66,18 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
             trial_documents = list(unique_documents.values())
 
         # Calculate weighted average for similarity score
-        # nctIds = [item["nctId"] for item in trial_documents]
-        # weighted_similarity_scores_response = process_similarity_scores(target_documents_ids=nctIds,
-        #                                                        user_input_document=documents_search_keys)
-        # if weighted_similarity_scores_response["success"] is True:
-        #     for item in weighted_similarity_scores_response["data"]:
-        #         for subitem in trial_documents:
-        #             if subitem["nctId"] == item["nctId"]:
-        #                 subitem["weighted_similarity_score"] = item["weighted_similarity_score"]
-        #         print("Calculated weighted_similarity_score")
+        nctIds = [item["nctId"] for item in trial_documents]
+        weighted_similarity_scores_response = process_similarity_scores(target_documents_ids=nctIds,
+                                                                        user_input_document=documents_search_keys,
+                                                                        weights=documents_search_keys.get("weights", default_weights))
+        if weighted_similarity_scores_response["success"] is True:
+            for item in weighted_similarity_scores_response["data"]:
+                for subitem in trial_documents:
+                    if subitem["nctId"] == item["nctId"]:
+                        subitem["weighted_similarity_score"] = item["weighted_similarity_score"]
+                        subitem["module_similarity_scores"] = item["similarity_scores"]
 
+        print("Calculated weighted_similarity_score")
 
         # Sort trial based on score
         trial_documents = [item for item in trial_documents if item["similarity_score"] >= 90]
@@ -77,5 +89,5 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
         return final_response
 
     except Exception as e:
-        final_response["message"] += f" {e}"
+        final_response["message"] += f"Unexpected error occurred while fetching similar documents: {e}"
         return final_response

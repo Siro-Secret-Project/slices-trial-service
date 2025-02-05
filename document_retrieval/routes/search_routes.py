@@ -1,5 +1,5 @@
 from fastapi import APIRouter,Response, status
-from document_retrieval.models.routes_models import BaseResponse, SearchDocuments, GenerateEligibilityCriteria
+from document_retrieval.models.routes_models import BaseResponse, GenerateEligibilityCriteria, DocumentSearch
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from document_retrieval.services.generate_trial_eligibility_certeria import generate_trial_eligibility_criteria
 
@@ -43,12 +43,12 @@ router = APIRouter()
 
 
 @router.post("/search_documents", response_model=BaseResponse)
-async def search_routes_new(request: SearchDocuments, response: Response):
+async def search_routes_new(request: DocumentSearch, response: Response):
     """
     Endpoint to search for documents based on inclusion criteria, exclusion criteria, and rationale.
 
     Args:
-        request (SearchDocuments): The request body containing search criteria.
+        request (DocumentSearch): The request body containing search criteria.
         response (Response): The FastAPI Response object.
 
     Returns:
@@ -68,13 +68,15 @@ async def search_routes_new(request: SearchDocuments, response: Response):
         rationale = request.rationale if request.rationale != "" else None
         objective = request.objective if request.objective != "" else None
         trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
+        weights = request.weights
 
         input_document = {
-            "inclusion_criteria": inclusion_criteria,
-            "exclusion_criteria": exclusion_criteria,
+            "inclusionCriteria": inclusion_criteria,
+            "exclusionCriteria": exclusion_criteria,
             "rationale": rationale,
             "objective": objective,
-            "trial_outcomes": trial_outcomes,
+            "trialOutcomes": trial_outcomes,
+            "weights": weights
         }
 
         # Fetch similar documents based on the input criteria
@@ -147,11 +149,11 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
 
         # Prepare the input document for fetching similar documents
         input_document = {
-            "inclusion_criteria": inclusion_criteria,
-            "exclusion_criteria": exclusion_criteria,
+            "inclusionCriteria": inclusion_criteria,
+            "exclusionCriteria": exclusion_criteria,
             "rationale": rationale,
             "objective": objective,
-            "trial_outcomes": trial_outcomes,
+            "trialOutcomes": trial_outcomes,
         }
 
         # Fetch and generate trial eligibility criteria using the input document

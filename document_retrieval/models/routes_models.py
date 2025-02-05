@@ -1,10 +1,13 @@
 from typing import Any
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-class SearchResult(BaseModel):
-    search_query: str
-    module: str = None
-    similarity_threshold: int = 50
+class WeightsModel(BaseModel):
+    inclusionCriteria: float = Field(0.2, ge=0, le=1)
+    exclusionCriteria: float = Field(0.2, ge=0, le=1)
+    objective: float = Field(0.2, ge=0, le=1)
+    rationale: float = Field(0.2, ge=0, le=1)
+    trialOutcomes: float = Field(0.2, ge=0, le=1)
+
 
 class BaseResponse(BaseModel):
     success: bool
@@ -12,12 +15,15 @@ class BaseResponse(BaseModel):
     message: str
     status_code: int
 
-class SearchDocuments(BaseModel):
+class SimilarDocuments(BaseModel):
     inclusionCriteria: str
     exclusionCriteria: str
     rationale: str
     objective: str
     efficacyEndpoints: str
 
-class GenerateEligibilityCriteria(SearchDocuments):
+class GenerateEligibilityCriteria(SimilarDocuments):
     ecid: str
+
+class DocumentSearch(SimilarDocuments):
+    weights: WeightsModel
