@@ -3,7 +3,6 @@ import os
 import json
 from openai import AzureOpenAI
 
-
 # Set up environment variables
 os.environ["AZURE_OPENAI_API_KEY"] = "7219267fcc1345cabcd25ac868c686c1"
 os.environ["AZURE_OPENAI_ENDPOINT"] = "https://stock-agent.openai.azure.com/"
