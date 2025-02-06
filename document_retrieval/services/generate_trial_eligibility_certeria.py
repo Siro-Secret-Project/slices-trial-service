@@ -40,6 +40,11 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
         inclusion_criteria = inclusion_criteria if inclusion_criteria is not None else "No inclusion criteria provided"
         exclusion_criteria = documents_search_keys["exclusionCriteria"]
         exclusion_criteria = exclusion_criteria if exclusion_criteria is not None else "No exclusion criteria provided"
+        trial_objectives = documents_search_keys["objective"]
+        trial_objectives = trial_objectives if trial_objectives is not None else "No trial objectives provided"
+        trialOutcomes = documents_search_keys["trialOutcomes"]
+        trialOutcomes = trialOutcomes if trialOutcomes is not None else "No trial outcomes provided"
+
 
         # Check if fetching similar documents was unsuccessful
         if trial_documents_response["success"] is False:
@@ -75,6 +80,8 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             similar_trial_documents=similar_documents,
             user_provided_inclusion_criteria=inclusion_criteria,
             user_provided_exclusion_criteria=exclusion_criteria,
+            user_provided_trial_outcome=trialOutcomes,
+            user_provided_trial_objective=trial_objectives
         )
         if eligibility_criteria_response["success"] is False:
             final_response["message"] = eligibility_criteria_response["message"]
