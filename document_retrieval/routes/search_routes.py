@@ -75,12 +75,12 @@ async def search_routes_new(request: DocumentSearch, response: Response):
             "exclusionCriteria": exclusion_criteria,
             "rationale": rationale,
             "objective": objective,
-            "trialOutcomes": trial_outcomes,
-            "weights": weights
+            "trialOutcomes": trial_outcomes
         }
 
         # Fetch similar documents based on the input criteria
-        similar_documents_response = await fetch_similar_documents_extended(documents_search_keys=input_document)
+        similar_documents_response = await fetch_similar_documents_extended(documents_search_keys=input_document,
+                                                                            custom_weights=weights.dict())
 
         # Handle the response from the fetch function
         if similar_documents_response["success"] is False:
