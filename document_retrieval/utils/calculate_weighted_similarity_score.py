@@ -4,6 +4,24 @@ from providers.openai.generate_embeddings import generate_embeddings_from_azure_
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
+def scale_modules_to_target(modules, target_percentage):
+    """
+    Scales the module scores such that their weighted sum equals the target percentage.
+
+    Parameters:
+        modules (dict): A dictionary where keys are module names and values are their original scores.
+        target_percentage (float): The desired total percentage after scaling.
+
+    Returns:
+        dict: A dictionary with module names as keys and their scaled percentage values.
+    """
+    total_score = sum(modules.values())
+
+    # Compute scaled percentages
+    scaled_modules = {key: (value / total_score) * target_percentage for key, value in modules.items()}
+
+    return scaled_modules
+
 
 def calculate_weighted_similarity_score(user_input_document: dict, target_document: dict, weights: dict) -> dict:
     """
@@ -121,10 +139,11 @@ def process_similarity_scores(target_documents_ids: list, user_input_document: d
             # Extract results and store them
             weighted_similarity_score = weighted_similarity_score_response["data"]["weighted_similarity_score"]
             similarity_scores = weighted_similarity_score_response["data"]["similarity_scores"]
+            scaled_similarity_score = scale_modules_to_target(similarity_scores, weighted_similarity_score)
             trial_target_document.append({
                 "nctId": nctId,
                 "weighted_similarity_score": weighted_similarity_score,
-                "similarity_scores": similarity_scores
+                "similarity_scores": scaled_similarity_score
             })
 
         final_response["success"] = True
