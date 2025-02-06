@@ -12,7 +12,7 @@ default_weights = {
 }
 
 
-async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
+async def fetch_similar_documents_extended(documents_search_keys: dict, custom_weights: dict = None) -> dict:
     """
     Fetch similar documents based on inclusion criteria, exclusion criteria, and trial rationale,
     ensuring unique values in the final list by retaining the entry with the highest similarity score.
@@ -67,9 +67,10 @@ async def fetch_similar_documents_extended(documents_search_keys: dict) -> dict:
 
         # Calculate weighted average for similarity score
         nctIds = [item["nctId"] for item in trial_documents]
+        weights = custom_weights if custom_weights is not None else default_weights
         weighted_similarity_scores_response = process_similarity_scores(target_documents_ids=nctIds,
                                                                         user_input_document=documents_search_keys,
-                                                                        weights=documents_search_keys.get("weights", default_weights))
+                                                                        weights=weights)
         if weighted_similarity_scores_response["success"] is True:
             for item in weighted_similarity_scores_response["data"]:
                 for subitem in trial_documents:
