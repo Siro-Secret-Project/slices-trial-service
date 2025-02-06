@@ -139,11 +139,10 @@ def process_similarity_scores(target_documents_ids: list, user_input_document: d
             # Extract results and store them
             weighted_similarity_score = weighted_similarity_score_response["data"]["weighted_similarity_score"]
             similarity_scores = weighted_similarity_score_response["data"]["similarity_scores"]
-            scaled_similarity_score = scale_modules_to_target(similarity_scores, weighted_similarity_score)
             trial_target_document.append({
                 "nctId": nctId,
                 "weighted_similarity_score": weighted_similarity_score,
-                "similarity_scores": scaled_similarity_score
+                "similarity_scores": similarity_scores
             })
 
         final_response["success"] = True
