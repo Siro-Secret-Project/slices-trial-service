@@ -1,7 +1,4 @@
-from database.mongo_db_connection import db
-
-# Get the MongoDB collection containing processed trial data
-t2dm_collection = db["t2dm_final_data_samples_processed"]
+from database.mongo_db_connection import MongoDBDAO
 
 def fetch_processed_trial_document_with_nct_id(nct_id: str, module: str = None) -> dict:
     """
@@ -22,6 +19,9 @@ def fetch_processed_trial_document_with_nct_id(nct_id: str, module: str = None) 
     }
 
     try:
+        # Initialize MongoDBDAO
+        mongo_dao = MongoDBDAO()
+
         # Mapping of module names to their corresponding fields in the database
         mapping = {
             "identificationModule": ["officialTitle"],
@@ -31,8 +31,15 @@ def fetch_processed_trial_document_with_nct_id(nct_id: str, module: str = None) 
             "designModule": ["designModule"]
         }
 
-        # Query MongoDB for the document using the nct_id (excluding _id and keywords fields)
-        document = t2dm_collection.find_one({"nctId": nct_id}, {"_id": 0, "keywords": 0})
+        # Define projection fields (excluding _id and keywords fields)
+        projection = {"_id": 0, "keywords": 0}
+
+        # Query MongoDB for the document using the nct_id
+        document = mongo_dao.find_one(
+            collection_name="t2dm_final_data_samples_processed",
+            query={"nctId": nct_id},
+            projection=projection
+        )
 
         if document:
             if module is None:
