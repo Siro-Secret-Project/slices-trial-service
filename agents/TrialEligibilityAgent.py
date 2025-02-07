@@ -1,10 +1,8 @@
 import json
-from collections import defaultdict
-import numpy as np
 
 
 class TrialEligibilityAgent:
-    def __init__(self, azure_client, pinecone_index, documents_collection, model="model-4o", max_tokens=500, temperature=0.2):
+    def __init__(self, azure_client, model="model-4o", max_tokens=500, temperature=0.2):
         """
         Initializes the TrialEligibilityAgent class.
 
@@ -16,10 +14,8 @@ class TrialEligibilityAgent:
         """
         self.azure_client = azure_client
         self.model = model
-        self.documents_collection = documents_collection
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.pinecone_index = pinecone_index
 
         self.categorisation_role = (
             """
@@ -136,101 +132,7 @@ class TrialEligibilityAgent:
 
         )
 
-    def generate_embeddings_from_azure_client(self, text):
-        try:
-              response = self.azure_client.embeddings.create(
-                  input=text,
-                  model="embedding_model"
-              )
-              # Extract and flatten the embedding
-              return np.array(json.loads(response.model_dump_json(indent=2))["data"][0]["embedding"]).reshape(1, 1536)
-        except Exception as e:
-              print(f"Error generating embeddings: {e}")
-              print(text)
-              return None
 
-    def query_pinecone_db(self, query: str, module: str = None) -> dict:
-        """
-        Queries the Pinecone database to fetch documents related to the provided query and module.
-
-        Parameters:
-            query (str): The query to search for.
-            module (str): The module to filter the results by.
-
-        Returns:
-            dict: The final response with documents fetched from Pinecone and MongoDB.
-        """
-        final_response = {
-            "success": False,
-            "message": "failed to fetch documents",
-            "data": None
-        }
-        try:
-            # Generate embedding for the query
-            embedding = self.generate_embeddings_from_azure_client(query).flatten().tolist()
-
-            # Query Pinecone and fetch similar documents
-            if module is not None:
-                result = self.pinecone_index.query(vector=embedding,
-                                                   top_k=10,
-                                                   include_metadata=True,
-                                                   include_values=True,
-                                                   filter={"module": {"$eq": module}})
-            else:
-                result = self.pinecone_index.query(vector=embedding,
-                                                   top_k=10,
-                                                   include_metadata=True,
-                                                   include_values=True)
-
-            # Process the Response Results
-            data = result
-
-            # Prepare a dictionary to store NCT IDs with their related information
-            nct_data = defaultdict(lambda: {'count': 0, 'max_score': 0, 'module_max_score': ''})
-
-            # Process the data
-            for match in data['matches']:
-                nct_id = match['metadata']['nctId']
-                module = match['metadata']['module']
-                score = match['score']
-                value = match['values']
-
-                # Update the count
-                nct_data[nct_id]['count'] += 1
-
-                # Update the max score and corresponding module
-                if score > nct_data[nct_id]['max_score']:
-                    nct_data[nct_id]['max_score'] = score
-                    nct_data[nct_id]['module_max_score'] = module
-                    nct_data[nct_id]['embeddings'] = value
-
-            # Prepare the final response data
-            final_data = []
-            for key, value in nct_data.items():
-                nctId = key
-                module = value['module_max_score']
-                similarity_score = int(value['max_score'] * 100)
-                if similarity_score < 50:
-                    continue
-                document_response = self.fetch_mongo_document(nctId, module)
-                if document_response['success'] is True:
-                    final_data.append({
-                        "nctId": nctId,
-                        "module": module,
-                        "similarity_score": similarity_score,
-                        "document": document_response['data']
-                    })
-
-            # Return the final response
-            final_response['data'] = final_data
-            final_response['success'] = True
-            final_response['message'] = "Successfully fetched documents"
-        except Exception as e:
-            final_response['message'] = f"Error occurred: {str(e)}"
-
-        return final_response
-
-    import json
 
     def draft_eligibility_criteria(self, sample_trial_rationale,
                                    similar_trial_documents,
@@ -354,7 +256,7 @@ class TrialEligibilityAgent:
                         response_format={"type": "json_object"},
                         messages=message_list,
                         stream=False,
-                        max_tokens=3000,
+                        max_tokens=self.max_tokens,
                         temperature=self.temperature
                     )
 
@@ -377,45 +279,3 @@ class TrialEligibilityAgent:
         except Exception as e:
             final_response["message"] = f"Error processing query rationale: {e}"
             return final_response
-
-
-    def fetch_mongo_document(self, nct_id: str, module: str = None) -> dict:
-        final_response = {
-            "success": False,
-            "message": "Failed to fetch document",
-            "data": None
-        }
-
-        try:
-            mapping = {
-                "identificationModule": ["officialTitle"],
-                "conditionsModule": ["conditions"],
-                "eligibilityModule": ["inclusionCriteria", "exclusionCriteria"],
-                "outcomesModule": ["primaryOutcomes", "secondaryOutcomes"],
-                "designModule": ["designModule"]
-            }
-
-            # Query MongoDB for the document using the nct_id
-            document = self.documents_collection.find_one({"nctId": nct_id}, {"_id": 0, "keywords": 0})
-
-            if document and module is None:
-                final_response["data"] = document
-                final_response["message"] = "Successfully fetched MongoDB document"
-                final_response["success"] = True
-                return final_response
-            elif document and module is not None:
-              document_items = mapping[module]
-              document_data = {}
-              for item in document_items:
-                document_data[item] = document[item]
-              final_response["data"] = document_data
-              final_response["message"] = "Successfully fetched MongoDB document"
-              final_response["success"] = True
-              return final_response
-            else:
-                final_response['message'] = f"Document with nctId '{nct_id}' not found"
-
-        except Exception as e:
-            final_response['message'] = f"Unexpected error while fetching MongoDB document: {e}"
-
-        return final_response

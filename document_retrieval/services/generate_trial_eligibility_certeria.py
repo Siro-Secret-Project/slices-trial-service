@@ -1,8 +1,7 @@
-from providers.pinecone.similarity_search_service import pinecone_index
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
 from providers.openai.generate_embeddings import azure_client
-from database.document_retrieval.fetch_processed_trial_document_with_nct_id import t2dm_collection, fetch_processed_trial_document_with_nct_id
+from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
 
 
 async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str) -> dict:
@@ -56,9 +55,7 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
         # Initialize the TrialEligibilityAgent with required parameters
         eligibility_agent = TrialEligibilityAgent(
             azure_client,
-            max_tokens=3000,
-            documents_collection=t2dm_collection,
-            pinecone_index=pinecone_index
+            max_tokens=3000
         )
 
         # Process and prepare similar trial documents for eligibility criteria generation
@@ -144,6 +141,7 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria
         final_response["success"] = True
+        final_response["message"] = "Successfully generated Eligibility Criteria"
         return final_response
 
     except Exception as e:
