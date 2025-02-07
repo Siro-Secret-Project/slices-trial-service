@@ -3,7 +3,6 @@ from document_retrieval.services.fetch_similar_documents_extended import fetch_s
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
 from providers.openai.generate_embeddings import azure_client
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import t2dm_collection, fetch_processed_trial_document_with_nct_id
-from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 
 
 async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str) -> dict:
@@ -137,23 +136,10 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             categorized_data_user[item_class]["Exclusion"].append(criteria)
 
 
-
-        # Store Job in DB
-        db_response = record_eligibility_criteria_job(job_id=ecid,
-                                                      trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
-                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
-                                                      categorized_data=categorizedData,
-                                                      categorized_data_user=categorized_user_data["data"],
-                                                      trial_documents=trial_documents)
-        if db_response["success"] is True:
-            final_response["message"] = db_response["message"]
-        else:
-            final_response["message"] = "Successfully generated trial eligibility criteria." + db_response["message"]
-
         # Add Categorized Data in final response
         model_generated_eligibility_criteria["categorizedData"] = categorizedData
         model_generated_eligibility_criteria["userCategorizedData"] = categorized_data_user
-        model_generated_eligibility_criteria["trial_documents"] = trial_documents
+        model_generated_eligibility_criteria["trialDocuments"] = trial_documents
 
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria
