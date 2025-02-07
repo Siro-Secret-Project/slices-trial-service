@@ -3,7 +3,7 @@ name: Deploy to ECR
 on:
   push:
     branches:
-      - staging  # Adjust to the branch you want to trigger on
+      - deploy  # Adjust to the branch you want to trigger on
 
 jobs:
   deploy:
@@ -27,13 +27,13 @@ jobs:
       - name: Log in to Amazon ECR
         id: login-ecr
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY_UAT }}
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPOSITORY }}
 
       - name: Build Docker image
         run: |
-          docker build -t slices-llm .
-          docker tag slices-llm:latest ${{ secrets.ECR_REPOSITORY_UAT }}:latest
+          docker build -t slices-trial-service .
+          docker tag slices-trial-service:latest ${{ secrets.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ secrets.ECR_REPOSITORY_UAT }}:latest
+          docker push ${{ secrets.ECR_REPOSITORY }}:latest
