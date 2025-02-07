@@ -2,6 +2,7 @@ from document_retrieval.services.fetch_similar_documents_extended import fetch_s
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
 from providers.openai.generate_embeddings import azure_client
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
+from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 
 
 async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str) -> dict:
@@ -132,6 +133,18 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
             criteria = item["criteria"]
             categorized_data_user[item_class]["Exclusion"].append(criteria)
 
+        # Store Job in DB
+        db_response = record_eligibility_criteria_job(job_id=ecid,
+                                                      trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
+                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
+                                                      categorized_data=categorizedData,
+                                                      categorized_data_user=categorized_user_data["data"],
+                                                      trial_documents=trial_documents)
+        if db_response["success"] is True:
+            final_response["message"] = db_response["message"]
+        else:
+            final_response["message"] = "Successfully generated trial eligibility criteria." + db_response["message"]
+
 
         # Add Categorized Data in final response
         model_generated_eligibility_criteria["categorizedData"] = categorizedData
@@ -141,7 +154,6 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria
         final_response["success"] = True
-        final_response["message"] = "Successfully generated Eligibility Criteria"
         return final_response
 
     except Exception as e:
