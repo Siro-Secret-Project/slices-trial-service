@@ -24,6 +24,7 @@ class SimilarDocuments(BaseModel):
 
 class GenerateEligibilityCriteria(SimilarDocuments):
     ecid: str
+    weights: WeightsModel
 
 class DocumentSearch(SimilarDocuments):
     weights: WeightsModel

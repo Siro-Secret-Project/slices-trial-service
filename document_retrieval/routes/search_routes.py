@@ -110,6 +110,7 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
         objective = request.objective if request.objective != "" else None
         trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
         ecid = request.ecid
+        weights = request.weights
 
         # Prepare the input document for fetching similar documents
         input_document = {
@@ -122,7 +123,8 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
 
         # Fetch and generate trial eligibility criteria using the input document
         similar_documents_response = await generate_trial_eligibility_criteria(documents_search_keys=input_document,
-                                                                               ecid=ecid)
+                                                                               ecid=ecid,
+                                                                               weights=weights.dict())
 
         # Handle the response from the eligibility criteria generation function
         if similar_documents_response["success"] is False:
