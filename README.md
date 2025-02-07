@@ -13,4 +13,4 @@ This is a Python backend using FastAPI with a microservice architecture.
 3. Access the API at `http://localhost:8000`
 
 ## Endpoints
-- `/search_documents`: It processes text input, converts it into embeddings, and queries a Pinecone database to return the NCT ID of the most similar documents.
+- `/search_documents`: It processes text input, converts it into embeddings, and queries a Pinecone database to return the NCT ID of the most similar documents
