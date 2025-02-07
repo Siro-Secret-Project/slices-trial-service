@@ -1,9 +1,9 @@
-from database.mongo_db_connection import db
+from database.mongo_db_connection import MongoDBDAO
 from datetime import datetime
 from document_retrieval.models.db_models import StoreEligibilityCriteria
 
-# Collection to store the job in MongoDB
-similar_trials_criteria_results_collection = db['similar_trials_criteria_results']
+# Initialize MongoDBDAO
+mongo_dao = MongoDBDAO()
 
 def record_eligibility_criteria_job(job_id: str,
                                     trial_inclusion_criteria: list,
@@ -31,15 +31,14 @@ def record_eligibility_criteria_job(job_id: str,
               - message (str): A message describing the outcome of the operation.
               - data (str or None): The ID of the inserted document if successful, otherwise None.
     """
-    # Initialize the final response structure
     final_response = {
-        "success": True,
-        "message": "",
+        "success": False,
+        "message": "Failed to store similar trials criteria results",
         "data": None
     }
 
     try:
-        # Create a document for MongoDB using the StoreEligibilityCriteria model
+        # Create a document using the StoreEligibilityCriteria model
         document = StoreEligibilityCriteria(
             ecid=job_id,
             inclusion_criteria=trial_inclusion_criteria,
@@ -47,26 +46,20 @@ def record_eligibility_criteria_job(job_id: str,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
             trailDocuments=trial_documents,
-            created_at=datetime.now(),  # Timestamp for when the document is created
-            updated_at=datetime.now(),  # Timestamp for when the document is last updated
-        )
+            created_at=datetime.now(),
+            updated_at=datetime.now(),
+        ).dict()
 
-        # Insert the document into the MongoDB collection
-        db_response = similar_trials_criteria_results_collection.insert_one(document.dict())
+        # Insert the document using MongoDBDAO
+        db_response = mongo_dao.insert("similar_trials_criteria_results", document)
 
         # Check if the document was successfully inserted
-        if db_response.inserted_id:
+        if db_response:
             final_response["success"] = True
-            final_response["message"] = f"Successfully generated and stored similar trials criteria results: {db_response.inserted_id}"
-            final_response["data"] = db_response.inserted_id
-        else:
-            # If insertion failed, update the response message
-            final_response["success"] = False
-            final_response["message"] = "Failed to store similar trials criteria results"
+            final_response["message"] = f"Successfully stored similar trials criteria results: {db_response}"
+            final_response["data"] = db_response
 
     except Exception as e:
-        # Handle any exceptions and update the response message with the error details
-        final_response['success'] = False
-        final_response['message'] = f"Failed to store similar trials criteria results: {e}"
+        final_response["message"] = f"Error storing similar trials criteria results: {e}"
 
     return final_response
