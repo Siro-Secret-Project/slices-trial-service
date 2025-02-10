@@ -28,7 +28,7 @@ def fetch_trial_filters(trial_documents: list) -> dict:
                 countries = set()
                 for location in trial_locations:
                     countries.add(location["country"])
-                item["locations"] = countries
+                item["locations"] = list(countries)
 
                 # fetch phase for document
                 phases_info = preprocessed_trial_document["protocolSection"].get("designModule",{}).get("phases", ["Unknown"])

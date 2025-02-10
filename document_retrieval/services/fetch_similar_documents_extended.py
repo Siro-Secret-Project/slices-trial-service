@@ -90,7 +90,6 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         print("Calculated weighted_similarity_score")
 
         # Sort trial based on score
-        trial_documents = [item for item in trial_documents if item["similarity_score"] >= 90]
         trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["similarity_score"], reverse=True)
 
         # Store Similar trials
