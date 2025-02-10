@@ -70,6 +70,8 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             print(f"Documents length: {len(trial_documents)}")
             if len(trial_documents) == 0:
                 final_response["message"] = "No Documents Found matching criteria."
+                final_response["success"] = True
+                final_response["data"] = []
                 return final_response
         else:
             trial_documents = list(unique_documents.values())
