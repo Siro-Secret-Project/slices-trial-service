@@ -1,6 +1,9 @@
 from document_retrieval.utils.process_criteria import process_criteria
 from document_retrieval.utils.fetch_trial_filters import fetch_trial_filters
+from document_retrieval.utils.process_filters import process_filters
 from document_retrieval.utils.calculate_weighted_similarity_score import process_similarity_scores
+from database.document_retrieval.store_similar_trials import store_similar_trials
+
 
 # Defaults weights
 default_weights = {
@@ -12,7 +15,7 @@ default_weights = {
 }
 
 
-async def fetch_similar_documents_extended(documents_search_keys: dict, custom_weights: dict = None) -> dict:
+async def fetch_similar_documents_extended(documents_search_keys: dict, custom_weights: dict, document_filters: dict, user_data: dict) -> dict:
     """
     Fetch similar documents based on inclusion criteria, exclusion criteria, and trial rationale,
     ensuring unique values in the final list by retaining the entry with the highest similarity score.
@@ -62,6 +65,12 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         fetch_add_documents_filter_response = fetch_trial_filters(trial_documents=list(unique_documents.values()))
         if fetch_add_documents_filter_response["success"] is True:
             trial_documents = fetch_add_documents_filter_response["data"]
+            print(f"Documents length: {len(trial_documents)}")
+            trial_documents = process_filters(documents=trial_documents, filters=document_filters)
+            print(f"Documents length: {len(trial_documents)}")
+            if len(trial_documents) == 0:
+                final_response["message"] = "No Documents Found matching criteria."
+                return final_response
         else:
             trial_documents = list(unique_documents.values())
 
@@ -83,6 +92,15 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         # Sort trial based on score
         trial_documents = [item for item in trial_documents if item["similarity_score"] >= 90]
         trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["similarity_score"], reverse=True)
+
+        # Store Similar trials
+        user_inputs = documents_search_keys | document_filters
+        db_response = store_similar_trials(user_name=user_data["userName"],
+                                           ecid=user_data["ecid"],
+                                           user_input=user_inputs,
+                                           similar_trials=trial_documents)
+
+        print(db_response)
 
         final_response["data"] = trial_documents
         final_response["success"] = True

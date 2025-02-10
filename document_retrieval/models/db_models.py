@@ -10,3 +10,11 @@ class StoreEligibilityCriteria(BaseModel):
     categorizedData: dict
     userCategorizedData: dict
     trailDocuments: list
+
+class StoreSimilarTrials(BaseModel):
+    ecid: str
+    userName: str
+    userInput: dict
+    similarTrials: list
+    created_at: datetime
+    updated_at: datetime
