@@ -5,7 +5,7 @@ from database.document_retrieval.fetch_processed_trial_document_with_nct_id impo
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 
 
-async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str) -> dict:
+async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str, weights: dict) -> dict:
     """
     Generates trial eligibility criteria based on similar trial documents and a provided rationale.
 
@@ -17,6 +17,7 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
                                      for the trial and other parameters required to fetch similar
                                      trial documents.
         ecid (str): The Job ID for the Eligibility Agent.
+        weights (dict): A search weights for the Eligibility Agent.
 
     Returns:
         dict: A response dictionary containing:
@@ -34,7 +35,8 @@ async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid:
 
     try:
         # Fetch similar trial documents using the provided search keys
-        trial_documents_response = await fetch_similar_documents_extended(documents_search_keys=documents_search_keys)
+        trial_documents_response = await fetch_similar_documents_extended(documents_search_keys=documents_search_keys,
+                                                                          custom_weights=weights)
         inclusion_criteria = documents_search_keys["inclusionCriteria"]
         inclusion_criteria = inclusion_criteria if inclusion_criteria is not None else "No inclusion criteria provided"
         exclusion_criteria = documents_search_keys["exclusionCriteria"]
