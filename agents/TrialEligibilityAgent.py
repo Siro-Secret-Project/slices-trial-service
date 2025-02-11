@@ -2,7 +2,7 @@ import json
 
 
 class TrialEligibilityAgent:
-    def __init__(self, azure_client, model="model-4o", max_tokens=500, temperature=0.2):
+    def __init__(self, azure_client, model="model-4o", max_tokens=5000, temperature=0.2):
         """
         Initializes the TrialEligibilityAgent class.
 
@@ -102,6 +102,7 @@ class TrialEligibilityAgent:
                with the highest similarity score to the trial rationale.
                - Ensure that the selected criteria are the most relevant to the current trial.
             3. Provide NCT ID of each criteria to track from which trial document it was extracted.
+            4. Avoid Redundant criteria.
     
             Response Format:
             json_object

@@ -7,10 +7,12 @@ def categorize_eligibility_criteria(eligibility_agent, eligibility_criteria) -> 
     categorized_data = {}
     for item in categorized_response["data"]["inclusionCriteria"]:
         item_class = item["class"]
-        categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Inclusion"].append(item["criteria"])
+        value = {"criteria": item["criteria"], "nctId": item["nctId"]}
+        categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Inclusion"].append(value)
 
     for item in categorized_response["data"]["exclusionCriteria"]:
         item_class = item["class"]
-        categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Exclusion"].append(item["criteria"])
+        value = {"criteria": item["criteria"], "nctId": item["nctId"]}
+        categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Exclusion"].append(value)
 
     return {"success": True, "data": categorized_data}
