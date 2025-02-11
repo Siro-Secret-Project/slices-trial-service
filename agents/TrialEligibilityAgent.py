@@ -48,7 +48,7 @@ class TrialEligibilityAgent:
     
                 2. For each criterion, provide:
                     - Criteria: A precise inclusion or exclusion statement.
-                    - Reasoning: A brief explanation, referencing similar trials (NCT IDs) when applicable.
+                    - nctId: NCT IDs of the trial.
                     - Class: The specific category from the 14 key factors above.
     
             Response Format:
@@ -57,14 +57,14 @@ class TrialEligibilityAgent:
                     "inclusionCriteria": [
                         {
                             "criteria": "string",
-                            "reasoning": "string",
+                            "nctId": "string",
                             "class": "string"
                         }
                     ],
                     "exclusionCriteria": [
                         {
                             "criteria": "string",
-                            "reasoning": "string",
+                            "nctId": "string",
                             "class": "string"
                         }
                     ]
@@ -97,13 +97,11 @@ class TrialEligibilityAgent:
     
             Task:
             1. Extract all eligibility criteria (both Inclusion and Exclusion) from the provided similar trial documents.
-            2. Integrate user-provided criteria into the extracted list, ensuring consistency and relevance.
-            3. Resolve conflicts in criteria:
+            2. Resolve conflicts in criteria:
                - If multiple documents provide conflicting criteria (e.g., drug levels, lab values), prioritize the one 
                with the highest similarity score to the trial rationale.
                - Ensure that the selected criteria are the most relevant to the current trial.
-            4. Provide justification for each selected criterion, referencing the source trial (e.g., NCT ID) and 
-            explaining why it was chosen.
+            3. Provide NCT ID of each criteria to track from which trial document it was extracted.
     
             Response Format:
             json_object
@@ -111,23 +109,24 @@ class TrialEligibilityAgent:
               "inclusionCriteria": [
                 {
                   "criteria": "string",
-                  "reasoning": "string"
+                  "nctId": "string"
                 }
               ],
               "exclusionCriteria": [
                 {
                   "criteria": "string",
-                  "reasoning": "string"
+                  "nctId": "string"
                 }
               ]
             }
     
             Notes:
             - Ensure that the criteria align with the trial rationale and objectives.
-            - Reference similar trials (NCT IDs) for justification.
-            - Justifications should be concise and evidence-based.
+            - Reference similar trials (NCT IDs).
             - If lab values are included, explain their significance.
             - Prioritize consistency between extracted criteria, user inputs, and trial goals.
+            - User Provided Inputs (Trial-Specific) are the ground truth. Like if something is given as exclusion criteria.
+              by user mark it as exclusion criteria even it is a Inclusion criteria in trial documents and vice versa.
             """
 
         )

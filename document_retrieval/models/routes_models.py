@@ -7,23 +7,12 @@ class BaseResponse(BaseModel):
     message: str
     status_code: int
 
-class SimilarDocuments(BaseModel):
-    inclusionCriteria: str
-    exclusionCriteria: str
-    rationale: str
-    objective: str
-    efficacyEndpoints: str
-
 class WeightsModel(BaseModel):
     inclusionCriteria: float = Field(0, ge=0, le=1)
     exclusionCriteria: float = Field(0, ge=0, le=1)
     objective: float = Field(0, ge=0, le=1)
     rationale: float = Field(0, ge=0, le=1)
     trialOutcomes: float = Field(0, ge=0, le=1)
-
-class GenerateEligibilityCriteria(SimilarDocuments):
-    ecid: str
-    weights: WeightsModel
 
 class DocumentSearch(BaseModel):
     ecid: str
@@ -36,6 +25,10 @@ class DocumentSearch(BaseModel):
     exclusionCriteria: str
     interventionType: str
     weights: WeightsModel
+
+class GenerateEligibilityCriteria(BaseModel):
+    ecid: str
+    trialDocuments: list
 
 class DocumentFilters(DocumentSearch):
     phase: List[str]
