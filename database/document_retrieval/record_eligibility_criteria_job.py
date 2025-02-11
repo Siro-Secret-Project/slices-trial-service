@@ -9,8 +9,7 @@ def record_eligibility_criteria_job(job_id: str,
                                     trial_inclusion_criteria: list,
                                     trial_exclusion_criteria: list,
                                     categorized_data: dict,
-                                    categorized_data_user: dict,
-                                    trial_documents: list) -> dict:
+                                    categorized_data_user: dict) -> dict:
     """
     Stores the generated eligibility criteria (inclusion and exclusion) as a job in MongoDB.
 
@@ -23,7 +22,6 @@ def record_eligibility_criteria_job(job_id: str,
         trial_exclusion_criteria (list): A list of exclusion criteria for the trial.
         categorized_data (dict): Categorized eligibility criteria in 14 categories.
         categorized_data_user (dict): Categorized user provided eligibility criteria in 14 categories.
-        trial_documents (list): Similar trial documents associated with this job.
 
     Returns:
         dict: A response dictionary containing:
@@ -45,7 +43,6 @@ def record_eligibility_criteria_job(job_id: str,
             exclusion_criteria=trial_exclusion_criteria,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
-            trailDocuments=trial_documents,
             created_at=datetime.now(),
             updated_at=datetime.now(),
         ).dict()
@@ -56,8 +53,7 @@ def record_eligibility_criteria_job(job_id: str,
         # Check if the document was successfully inserted
         if db_response:
             final_response["success"] = True
-            final_response["message"] = f"Successfully stored similar trials criteria results: {db_response}"
-            final_response["data"] = db_response
+            final_response["message"] = f"Successfully stored similar trials criteria results: {db_response.inserted_id}"
 
     except Exception as e:
         final_response["message"] = f"Error storing similar trials criteria results: {e}"

@@ -125,8 +125,7 @@ class TrialEligibilityAgent:
             - Reference similar trials (NCT IDs).
             - If lab values are included, explain their significance.
             - Prioritize consistency between extracted criteria, user inputs, and trial goals.
-            - User Provided Inputs (Trial-Specific) are the ground truth. Like if something is given as exclusion criteria.
-              by user mark it as exclusion criteria even it is a Inclusion criteria in trial documents and vice versa.
+            - Eligibility Criteria must be from trial documents only, so each criteria must have a NCT ID related to it.
             """
 
         )
