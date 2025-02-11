@@ -114,25 +114,6 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
     """
     API endpoint to generate trial eligibility criteria based on input search parameters.
 
-    This route accepts a request containing search parameters (e.g., inclusion/exclusion criteria,
-    rationale, objective, and trial outcomes) and uses them to fetch and generate trial eligibility
-    criteria. The response includes the generated criteria or an error message if the operation fails.
-
-    Args:
-        request (GenerateEligibilityCriteria): The request object containing search parameters:
-            - inclusionCriteria (str): Inclusion criteria for the trial.
-            - exclusionCriteria (str): Exclusion criteria for the trial.
-            - rationale (str): Rationale for the trial.
-            - objective (str): Objective of the trial.
-            - efficacyEndpoints (str): Efficacy endpoints or trial outcomes.
-        response (Response): The FastAPI response object used to set HTTP status codes.
-
-    Returns:
-        BaseResponse: A response object containing:
-            - success (bool): Indicates whether the operation was successful.
-            - status_code (int): HTTP status code of the response.
-            - data (dict or None): Contains the generated eligibility criteria if successful.
-            - message (str): A message describing the outcome of the operation.
     """
     # Initialize the base response structure with default values
     base_response = BaseResponse(
@@ -144,41 +125,24 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
 
     try:
         # Extract and sanitize input criteria from the request
-        inclusion_criteria = request.inclusionCriteria if request.inclusionCriteria != "" else None
-        exclusion_criteria = request.exclusionCriteria if request.exclusionCriteria != "" else None
-        rationale = request.rationale if request.rationale != "" else None
-        objective = request.objective if request.objective != "" else None
-        trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
         ecid = request.ecid
-        weights = request.weights
-
-        # Prepare the input document for fetching similar documents
-        input_document = {
-            "inclusionCriteria": inclusion_criteria,
-            "exclusionCriteria": exclusion_criteria,
-            "rationale": rationale,
-            "objective": objective,
-            "trialOutcomes": trial_outcomes,
-        }
-
-        # Fetch and generate trial eligibility criteria using the input document
-        similar_documents_response = await generate_trial_eligibility_criteria(documents_search_keys=input_document,
-                                                                               ecid=ecid,
-                                                                               weights=weights.dict())
+        trial_documents = request.trialDocuments
+        eligibility_criteria_response = await generate_trial_eligibility_criteria(ecid=ecid,
+                                                                                  trail_documents_ids=trial_documents)
 
         # Handle the response from the eligibility criteria generation function
-        if similar_documents_response["success"] is False:
+        if eligibility_criteria_response["success"] is False:
             # If the operation fails, update the base response with the error message
             base_response.success = False
-            base_response.message = similar_documents_response["message"]
+            base_response.message = eligibility_criteria_response["message"]
             response.status_code = status.HTTP_400_BAD_REQUEST
             return base_response
         else:
             # If the operation succeeds, update the base response with the generated criteria
             base_response.success = True
-            base_response.message = similar_documents_response["message"]
+            base_response.message = eligibility_criteria_response["message"]
             base_response.status_code = status.HTTP_200_OK
-            base_response.data = similar_documents_response["data"]
+            base_response.data = eligibility_criteria_response["data"]
             response.status_code = status.HTTP_200_OK
             return base_response
 
