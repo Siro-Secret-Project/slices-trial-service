@@ -69,8 +69,8 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
 
         # Format the generated eligibility criteria
         model_generated_eligibility_criteria = {
-            "inclusionCriteria": [item["criteria"] for item in eligibility_criteria["inclusionCriteria"]],
-            "exclusionCriteria": [item["criteria"] for item in eligibility_criteria["exclusionCriteria"]],
+            "inclusionCriteria": [ {"criteria": item["criteria"], "nctId": item["nctId"]} for item in eligibility_criteria["inclusionCriteria"]],
+            "exclusionCriteria": [ {"criteria": item["criteria"], "nctId": item["nctId"]} for item in eligibility_criteria["exclusionCriteria"]],
         }
 
         # Categorise response
@@ -88,8 +88,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
                                                       trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
                                                       trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
                                                       categorized_data=categorizedGeneratedData,
-                                                      categorized_data_user=categorizedUserData,
-                                                      trial_documents=trial_documents)
+                                                      categorized_data_user=categorizedUserData)
         if db_response["success"] is True:
             final_response["message"] = db_response["message"]
         else:
@@ -99,7 +98,6 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         # Add Categorized Data in final response
         model_generated_eligibility_criteria["categorizedData"] = categorizedGeneratedData
         model_generated_eligibility_criteria["userCategorizedData"] = categorizedUserData
-        model_generated_eligibility_criteria["trialDocuments"] = trial_documents
 
         # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria
