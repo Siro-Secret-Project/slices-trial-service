@@ -50,7 +50,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
                 continue
 
         # Initialize the TrialEligibilityAgent with required parameters
-        eligibility_agent = TrialEligibilityAgent(azure_client, max_tokens=5000)
+        eligibility_agent = TrialEligibilityAgent(azure_client, max_tokens=4000)
 
         # Generate eligibility criteria using the eligibility agent
         eligibility_criteria_response = eligibility_agent.draft_eligibility_criteria(

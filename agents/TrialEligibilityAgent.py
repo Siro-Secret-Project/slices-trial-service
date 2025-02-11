@@ -2,7 +2,7 @@ import json
 
 
 class TrialEligibilityAgent:
-    def __init__(self, azure_client, model="model-4o", max_tokens=5000, temperature=0.2):
+    def __init__(self, azure_client, model="model-4o", max_tokens=4000, temperature=0.2):
         """
         Initializes the TrialEligibilityAgent class.
 
