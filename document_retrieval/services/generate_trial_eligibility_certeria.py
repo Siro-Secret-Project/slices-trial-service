@@ -4,6 +4,7 @@ from database.document_retrieval.fetch_processed_trial_document_with_nct_id impo
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
 from document_retrieval.utils.categorize_eligibility_criteria import categorize_eligibility_criteria
+from utils.generate_object_id import generate_object_id
 
 
 async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
@@ -64,35 +65,61 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         if eligibility_criteria_response["success"] is False:
             final_response["message"] = eligibility_criteria_response["message"]
             return final_response
+        print("Criteria Generated")
 
         eligibility_criteria = eligibility_criteria_response["data"]
+        generated_inclusion_criteria = eligibility_criteria_response["data"]["inclusionCriteria"]
+        filtered_inclusion_criteria = []
+        for item in generated_inclusion_criteria:
+            item["criteriaID"] = f"cid_{generate_object_id()}"
+            filtered_inclusion_criteria.append(item)
+
+        generated_exclusion_criteria = eligibility_criteria_response["data"]["exclusionCriteria"]
+        filtered_exclusion_criteria = []
+        for item in generated_exclusion_criteria:
+            item["criteriaID"] = f"cid_{generate_object_id()}"
+            filtered_exclusion_criteria.append(item)
+
+        final_data = {
+            "inclusionCriteria": filtered_inclusion_criteria,
+            "exclusionCriteria": filtered_exclusion_criteria
+        }
+        print("Added IDs")
 
         # Format the generated eligibility criteria
-        model_generated_eligibility_criteria = {
-            "inclusionCriteria": [ {"criteria": item["criteria"], "nctId": item["nctId"]} for item in eligibility_criteria["inclusionCriteria"]],
-            "exclusionCriteria": [ {"criteria": item["criteria"], "nctId": item["nctId"]} for item in eligibility_criteria["exclusionCriteria"]],
-        }
+        model_generated_eligibility_criteria = {}
 
         # Categorise response
         categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent=eligibility_agent,
-                                                                   eligibility_criteria=eligibility_criteria)
+                                                                   eligibility_criteria=final_data)
         categorizedGeneratedData = categorizedGeneratedData["data"]
+        print("Categorized System Data")
 
-        user_provided_criteria = f"Inclusion Criteria: {inclusion_criteria}, Exclusion Criteria: {exclusion_criteria}"
+
+        user_provided_criteria = {
+            "inclusionCriteria": [{"criteria": inclusion_criteria,
+                                  "criteriaID": f"cid_{generate_object_id()}",
+                                  "source": "User Provided"}],
+            "exclusionCriteria": [{"criteria": exclusion_criteria,
+                                  "criteriaID": f"cid_{generate_object_id()}",
+                                  "source": "User Provided"}],
+        }
         categorizedUserData = categorize_eligibility_criteria(eligibility_agent=eligibility_agent,
                                                               eligibility_criteria=user_provided_criteria)
         categorizedUserData = categorizedUserData["data"]
+        print("Categorized User Data")
+
 
         # Store Job in DB
         db_response = record_eligibility_criteria_job(job_id=ecid,
-                                                      trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
-                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
                                                       categorized_data=categorizedGeneratedData,
                                                       categorized_data_user=categorizedUserData)
         if db_response["success"] is True:
             final_response["message"] = db_response["message"]
         else:
             final_response["message"] = "Successfully generated trial eligibility criteria." + db_response["message"]
+
+        print(db_response)
 
 
         # Add Categorized Data in final response

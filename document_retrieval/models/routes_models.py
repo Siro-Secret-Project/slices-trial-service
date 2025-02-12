@@ -41,3 +41,7 @@ class DocumentFilters(DocumentSearch):
     countryLogic: Literal["AND", "OR"] = "OR"
     safetyAssessment: Optional[str] = ""
 
+class FetchSource(BaseModel):
+    ecid: str
+    criteriaID: str
+    target_id: list

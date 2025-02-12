@@ -6,8 +6,6 @@ from document_retrieval.models.db_models import StoreEligibilityCriteria
 mongo_dao = MongoDBDAO()
 
 def record_eligibility_criteria_job(job_id: str,
-                                    trial_inclusion_criteria: list,
-                                    trial_exclusion_criteria: list,
                                     categorized_data: dict,
                                     categorized_data_user: dict) -> dict:
     """
@@ -18,8 +16,6 @@ def record_eligibility_criteria_job(job_id: str,
 
     Args:
         job_id (str): The unique identifier for the job (ECID).
-        trial_inclusion_criteria (list): A list of inclusion criteria for the trial.
-        trial_exclusion_criteria (list): A list of exclusion criteria for the trial.
         categorized_data (dict): Categorized eligibility criteria in 14 categories.
         categorized_data_user (dict): Categorized user provided eligibility criteria in 14 categories.
 
@@ -39,8 +35,6 @@ def record_eligibility_criteria_job(job_id: str,
         # Create a document using the StoreEligibilityCriteria model
         document = StoreEligibilityCriteria(
             ecid=job_id,
-            inclusion_criteria=trial_inclusion_criteria,
-            exclusion_criteria=trial_exclusion_criteria,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
             created_at=datetime.now(),
