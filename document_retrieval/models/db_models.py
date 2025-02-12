@@ -3,8 +3,6 @@ from pydantic import BaseModel
 
 class StoreEligibilityCriteria(BaseModel):
     ecid: str
-    inclusion_criteria: list
-    exclusion_criteria: list
     categorizedData: dict
     userCategorizedData: dict
     created_at: datetime

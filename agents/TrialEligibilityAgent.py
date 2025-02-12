@@ -20,13 +20,13 @@ class TrialEligibilityAgent:
         self.categorisation_role = (
             """
             Medical Trial Eligibility Criteria Writer Agent
-    
+
             Objective:
                 Your primary task is to categorise the provided eligibility criteria into to provided 14 classes.
-    
+
             Inputs:
                 1. List of eligibility criteria.
-    
+
             Task:
                 Using the provided inputs:
                 1. Define Inclusion Criteria and Exclusion Criteria based on the following 14 key factors:
@@ -45,31 +45,28 @@ class TrialEligibilityAgent:
                     - Mental Health Disorders
                     - Infectious Diseases
                     - Other (if applicable)
-    
+
                 2. For each criterion, provide:
-                    - Criteria: A precise inclusion or exclusion statement.
-                    - nctId: NCT IDs of the trial.
+                    - criteriaID: Unique ID of criteria.
                     - Class: The specific category from the 14 key factors above.
-    
+
             Response Format:
                 json_object:
                 {
                     "inclusionCriteria": [
                         {
-                            "criteria": "string",
-                            "nctId": "string",
+                            "criteriaID": "string",
                             "class": "string"
                         }
                     ],
                     "exclusionCriteria": [
                         {
-                            "criteria": "string",
-                            "nctId": "string",
+                            "criteriaID": "string",
                             "class": "string"
                         }
                     ]
                 }
-    
+
             Guidelines:
                 - Maintain clarity, logic, and conciseness in explanations.
                 - HbA1c levels will come in Clinical and Laboratory Parameters
@@ -79,59 +76,62 @@ class TrialEligibilityAgent:
         self.medical_writer_agent_role = (
             """
             Medical Trial Eligibility Criteria Writer Agent
-    
+
             Role:
-            You are a Medical Trial Eligibility Criteria Writer Agent, responsible for extracting and refining 
+            You are a Medical Trial Eligibility Criteria Writer Agent, responsible for extracting
             Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
-    
+
             Permanent Inputs:
             1. Medical Trial Rationale – The rationale for conducting the trial.
             2. Similar/Existing Medical Trial Documents – Reference documents from similar trials to guide the criteria 
             selection.
-    
+
             Additional User-Provided Inputs (Trial-Specific):
             1. User Generated Inclusion Criteria – Additional inclusion criteria provided by the user.
             2. User Generated Exclusion Criteria – Additional exclusion criteria provided by the user.
             3. Trial Objective – The main goal of the trial.
             4. Trial Outcomes – The expected or desired outcomes of the trial.
-    
+
             Task:
-            1. Extract all eligibility criteria (both Inclusion and Exclusion) from the provided similar trial documents.
-            2. Resolve conflicts in criteria:
-               - If multiple documents provide conflicting criteria (e.g., drug levels, lab values), prioritize the one 
-               with the highest similarity score to the trial rationale.
-               - Ensure that the selected criteria are the most relevant to the current trial.
-            3. Provide NCT ID of each criteria to track from which trial document it was extracted.
-            4. Avoid Redundant criteria.
-    
+            1. Extract all the inclusion and exclusion criteria from the provided documents.
+            2. Take each criteria 1st document and find similar criteria in other document if match club them as one.
+            3. If not return it as with single source.
+             2. Ignore documents which are highly irrelavant from the provided inputs.
+            4. Strictly you should be using all provided criteria. Your generated criterias must be near equal to provided criteris
+            5. With each criteria provide a source containg each nctID of the trial and statment you used from that trial to generate the criteria.
+            6. Do not return user provided criteria they are just for reference. and 
+
             Response Format:
             json_object
             {
               "inclusionCriteria": [
                 {
                   "criteria": "string",
-                  "nctId": "string"
+                  "source":{
+                    "nctId1": "original statement",
+                    "nctId2": "original statement"
+                  }
                 }
               ],
               "exclusionCriteria": [
                 {
                   "criteria": "string",
-                  "nctId": "string"
+                  "source":{
+                    "nctId1": "original statement",
+                    "nctId2": "original statement"
+                  }
                 }
               ]
             }
-    
+
             Notes:
             - Ensure that the criteria align with the trial rationale and objectives.
             - Reference similar trials (NCT IDs).
-            - If lab values are included, explain their significance.
             - Prioritize consistency between extracted criteria, user inputs, and trial goals.
             - Eligibility Criteria must be from trial documents only, so each criteria must have a NCT ID related to it.
             """
 
         )
-
-
 
     def draft_eligibility_criteria(self, sample_trial_rationale,
                                    similar_trial_documents,
@@ -245,23 +245,23 @@ class TrialEligibilityAgent:
             """
 
             message_list = [
-                    {"role": "system", "content": self.categorisation_role},
-                    {"role": "user", "content": user_input}
+                {"role": "system", "content": self.categorisation_role},
+                {"role": "user", "content": user_input}
             ]
 
             try:
-                    response = self.azure_client.chat.completions.create(
-                        model=self.model,
-                        response_format={"type": "json_object"},
-                        messages=message_list,
-                        stream=False,
-                        max_tokens=self.max_tokens,
-                        temperature=self.temperature
-                    )
+                response = self.azure_client.chat.completions.create(
+                    model=self.model,
+                    response_format={"type": "json_object"},
+                    messages=message_list,
+                    stream=False,
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature
+                )
 
-                    json_response = json.loads(response.choices[0].message.content)
-                    inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
-                    exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
+                json_response = json.loads(response.choices[0].message.content)
+                inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
+                exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
 
 
             except Exception as e:
