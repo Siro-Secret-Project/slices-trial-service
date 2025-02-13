@@ -32,7 +32,7 @@ def query_pinecone_db_extended(query: str, module: str = None) -> dict:
 
         # Query Pinecone and fetch similar documents
         filters = {"module": {"$eq": module}} if module else None
-        result = pinecone_store.query(vector=embedding, filters=filters, k=5)
+        result = pinecone_store.query(vector=embedding, filters=filters, k=10)
 
         # Process the Response Results
         data = result

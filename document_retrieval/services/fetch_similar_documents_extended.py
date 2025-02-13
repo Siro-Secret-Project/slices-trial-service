@@ -88,7 +88,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         print("Calculated weighted_similarity_score")
 
         # Sort trial based on score
-        trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["similarity_score"], reverse=True)
+        trial_documents = sorted(trial_documents, key=lambda trial_item: trial_item["weighted_similarity_score"], reverse=True)
 
         # Store Similar trials
         db_response = store_similar_trials(user_name=user_data["userName"],
