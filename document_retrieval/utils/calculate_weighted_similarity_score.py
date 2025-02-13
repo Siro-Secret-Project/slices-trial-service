@@ -42,6 +42,7 @@ def calculate_weighted_similarity_score(user_input_document: dict, target_docume
         "data": None
     }
     try:
+        print(weights)
 
         # Identify modules that should be excluded (i.e., those with None values in user input)
         excluded_modules = [module for module, value in user_input_document.items() if value is None]

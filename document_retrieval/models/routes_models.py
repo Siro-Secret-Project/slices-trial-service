@@ -1,5 +1,11 @@
-from typing import Any
+from typing import Any, Literal, Optional, List
 from pydantic import BaseModel, Field
+
+class BaseResponse(BaseModel):
+    success: bool
+    data: Any
+    message: str
+    status_code: int
 
 class WeightsModel(BaseModel):
     inclusionCriteria: float = Field(0, ge=0, le=1)
@@ -8,22 +14,34 @@ class WeightsModel(BaseModel):
     rationale: float = Field(0, ge=0, le=1)
     trialOutcomes: float = Field(0, ge=0, le=1)
 
-
-class BaseResponse(BaseModel):
-    success: bool
-    data: Any
-    message: str
-    status_code: int
-
-class SimilarDocuments(BaseModel):
-    inclusionCriteria: str
-    exclusionCriteria: str
+class DocumentSearch(BaseModel):
+    ecid: str
+    userName: str
     rationale: str
     objective: str
+    condition: str
     efficacyEndpoints: str
-
-class GenerateEligibilityCriteria(SimilarDocuments):
-    ecid: str
-
-class DocumentSearch(SimilarDocuments):
+    inclusionCriteria: str
+    exclusionCriteria: str
+    interventionType: str
     weights: WeightsModel
+
+class GenerateEligibilityCriteria(BaseModel):
+    ecid: str
+    trialDocuments: list
+
+class DocumentFilters(DocumentSearch):
+    phase: List[str]
+    country: List[str]
+    startDate: Optional[str] = ""
+    endDate: Optional[str] = ""
+    sponsor: Optional[str] = ""
+    sampleSizeMin: Optional[str] = ""
+    sampleSizeMax: Optional[str] = ""
+    countryLogic: Literal["AND", "OR"] = "OR"
+    safetyAssessment: Optional[str] = ""
+
+class FetchSource(BaseModel):
+    ecid: str
+    criteriaID: str
+    target_id: list

@@ -21,7 +21,7 @@ def process_criteria(criteria: str, module: str = None) -> list:
     # generate a final data list
     final_list = [
         {"nctId": nctId, "similarity_score": score, "module": module} for nctId, score in validity_score.items() if
-        score >= 85
+        score >= 75
     ]
 
     return final_list
