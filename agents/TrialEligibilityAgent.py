@@ -85,6 +85,8 @@ class TrialEligibilityAgent:
             1. Medical Trial Rationale – The rationale for conducting the trial.
             2. Similar/Existing Medical Trial Documents – Reference documents from similar trials to guide the criteria 
             selection.
+            3. Already Generated Inclusion and Exclusion Criteria - These are the criteria generated in previous pass
+            so you can ignore them and do no generate again.
 
             Additional User-Provided Inputs (Trial-Specific):
             1. User Generated Inclusion Criteria – Additional inclusion criteria provided by the user.
@@ -93,13 +95,11 @@ class TrialEligibilityAgent:
             4. Trial Outcomes – The expected or desired outcomes of the trial.
 
             Task:
-            1. Extract all the inclusion and exclusion criteria from the provided documents.
-            2. Take each criteria 1st document and find similar criteria in other document if match club them as one.
-            3. If not return it as with single source.
-             2. Ignore documents which are highly irrelavant from the provided inputs.
-            4. Strictly you should be using all provided criteria. Your generated criterias must be near equal to provided criteris
-            5. With each criteria provide a source containg each nctID of the trial and statment you used from that trial to generate the criteria.
-            6. Do not return user provided criteria they are just for reference. and 
+            1. From the given document see how matching is document Official Title with trial rationale and other inputs.
+            2. If the document is matching, Take the relevant Eligibility criteria from the trial document matching the
+                provided trial rationale and other inputs.
+            3. From each document target is at least 2-3 criteria. 
+            4. Provide the criteria along with source statement and ID of trail. 
 
             Response Format:
             json_object
@@ -138,7 +138,9 @@ class TrialEligibilityAgent:
                                    user_provided_inclusion_criteria,
                                    user_provided_exclusion_criteria,
                                    user_provided_trial_objective,
-                                   user_provided_trial_outcome):
+                                   user_provided_trial_outcome,
+                                   generated_inclusion_criteria,
+                                   generated_exclusion_criteria,):
         """
         Drafts comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
 
@@ -149,6 +151,8 @@ class TrialEligibilityAgent:
             user_provided_exclusion_criteria (str): The user-provided exclusion criteria.
             user_provided_trial_objective (str): The trial objective as provided by the user.
             user_provided_trial_outcome (str): The expected outcome of the trial as provided by the user.
+            generated_exclusion_criteria (list): A list of generated exclusion criteria.
+            generated_inclusion_criteria (list): A list of generated inclusion criteria.
 
         Returns:
             dict: A dictionary containing:
@@ -175,7 +179,9 @@ class TrialEligibilityAgent:
                 User Provided Inclusion Criteria: {user_provided_inclusion_criteria}
                 User Provided Exclusion Criteria: {user_provided_exclusion_criteria}
                 Trial Objective: {user_provided_trial_objective}
-                Trial Outcomes: {user_provided_trial_outcome}
+                Trial Outcomes: {user_provided_trial_outcome},
+                Already Generated Inclusion Criteria: {generated_inclusion_criteria},
+                Already Exclusion Criteria: {generated_exclusion_criteria}
             """
 
             # Creating a message list for the Azure AI model
