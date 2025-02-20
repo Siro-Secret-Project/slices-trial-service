@@ -17,8 +17,7 @@ class TrialEligibilityAgent:
         self.max_tokens = max_tokens
         self.temperature = temperature
 
-        self.categorisation_role = (
-            """
+        self.categorisation_role = ("""
             Medical Trial Eligibility Criteria Writer Agent
 
             Objective:
@@ -70,11 +69,8 @@ class TrialEligibilityAgent:
             Guidelines:
                 - Maintain clarity, logic, and conciseness in explanations.
                 - HbA1c levels will come in Clinical and Laboratory Parameters
-            """
-
-        )
-        self.medical_writer_agent_role = (
-            """
+            """)
+        self.medical_writer_agent_role = ("""
             Medical Trial Eligibility Criteria Writer Agent
 
             Role:
@@ -125,9 +121,36 @@ class TrialEligibilityAgent:
             - Reference similar trials (NCT IDs).
             - Prioritize consistency between extracted criteria, user inputs, and trial goals.
             - Eligibility Criteria must be from trial documents only, so each criteria must have a NCT ID related to it.
-            """
+            """)
+        self.filter_role = ("""
+        The Role:
+        You are a agent responsible for filtering the AI generated trial Eligibility Criteria based on the provided 
+        Similarity Score.
+        You will be given AI generated eligibility criteria that will be redundant and you will have to filter them out
+        based on the similarity score.
 
-        )
+        The Process:
+        1. Take the remaining criteria and if there are multiple similar criteria like Age related then keep which has the highest similarity score.
+        2. Provide the remaining criteria Ids
+
+        The Inputs:
+        You will be provided with the following inputs:
+        1. Generated Inclusion Criteria - The AI generated Inclusion Criteria.
+        2. Generated Exclusion Criteria - The AI generated Exclusion Criteria.
+        3. Similarity Score - The similarity score of the generated criteria against the user provided criteria.
+        4. ID - The ID of the generated criteria.
+
+        The Output format:
+        You will provide the remaining criteria Ids in the following format:
+        json_object: {
+            "inclusionCriteria": [unique_criteria_id1, unique_criteria_id2],
+            "exclusionCriteria": [unique_criteria_id1, unique_criteria_id2]
+        }
+
+
+
+
+        """)
 
     def draft_eligibility_criteria(self, sample_trial_rationale,
                                    similar_trial_documents,
@@ -136,7 +159,7 @@ class TrialEligibilityAgent:
                                    user_provided_trial_objective,
                                    user_provided_trial_outcome,
                                    generated_inclusion_criteria,
-                                   generated_exclusion_criteria,):
+                                   generated_exclusion_criteria, ):
         """
         Drafts comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
 
@@ -279,4 +302,42 @@ class TrialEligibilityAgent:
             return final_response
         except Exception as e:
             final_response["message"] = f"Error processing query rationale: {e}"
+            return final_response
+
+    def filter_generated_criteria(self, generated_eligibility_criteria) -> dict:
+        final_response = {
+            "success": False,
+            "message": "Failed to filter eligibility criteria",
+            "data": None
+        }
+        try:
+            user_input = (
+                f"Generated Inclusion Criteria: {generated_eligibility_criteria['inclusionCriteria']}\n"
+                f"Generated Exclusion Criteria: {generated_eligibility_criteria['exclusionCriteria']}\n"
+            )
+
+            message_list = [
+                {"role": "system", "content": self.filter_role},
+                {"role": "user", "content": user_input}
+            ]
+            print(message_list)
+
+            response = self.azure_client.chat.completions.create(
+                model=self.model,
+                response_format={"type": "json_object"},
+                messages=message_list,
+                stream=False,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+
+            json_response = json.loads(response.choices[0].message.content)
+
+            final_response["data"] = json_response
+            final_response["success"] = True
+            final_response["message"] = "Successfully filtered eligibility criteria"
+            return final_response
+
+        except Exception as e:
+            final_response["message"] = f"Error filtering criteria: {e}"
             return final_response

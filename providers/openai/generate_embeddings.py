@@ -13,27 +13,27 @@ azure_client = AzureOpenAI(
 )
 
 def generate_embeddings_from_azure_client(text) -> dict:
-  final_response = {
-      "success": False,
-      "message": "Failed to generate embeddings.",
-      "data": None
-  }
-  try:
-        response = azure_client.embeddings.create(
-            input=text,
-            model="embedding_model"
-        )
-        # Extract and flatten the embedding
-        embedding = np.array(json.loads(response.model_dump_json(indent=2))["data"][0]["embedding"])
-        final_response["success"] = True
-        final_response["data"] = embedding.reshape(1, 1536)
-        final_response["message"] = "Successfully generated embeddings."
-        return final_response
-  except Exception as e:
-        print(f"Error generating embeddings: {e}")
-        final_response["success"] = False
-        final_response["message"] = f"Error generating embeddings: {e}"
-        return final_response
+      final_response = {
+          "success": False,
+          "message": "Failed to generate embeddings.",
+          "data": None
+      }
+      try:
+            response = azure_client.embeddings.create(
+                input=text,
+                model="embedding_model"
+            )
+            # Extract and flatten the embedding
+            embedding = np.array(json.loads(response.model_dump_json(indent=2))["data"][0]["embedding"])
+            final_response["success"] = True
+            final_response["data"] = embedding.reshape(1, 1536)
+            final_response["message"] = "Successfully generated embeddings."
+            return final_response
+      except Exception as e:
+            print(f"Error generating embeddings: {e}")
+            final_response["success"] = False
+            final_response["message"] = f"Error generating embeddings: {e}"
+            return final_response
 
 def validate_document_similarity(query: str, similar_documents: list):
       base_response = {
@@ -53,6 +53,10 @@ def validate_document_similarity(query: str, similar_documents: list):
               relevance are **lab values**, **age**, and **specific conditions that are considered in trial like BMI or 
               some drug**. 
               Common elements like informed consent should be ignored, as they are not significant for this task.
+            
+              **Warning**: If any document is going against the provided query, it should be assigned a similarity score 0.
+              E.g.: If the query say Exclude patients with Renal Failure, and the document includes patients with Renal Failure,
+                the similarity score should be 0.
 
               Respond in the following format:
               json_object:
@@ -77,8 +81,8 @@ def validate_document_similarity(query: str, similar_documents: list):
               model="model-4o",
               response_format={"type": "json_object"},
               messages=input_history,
-              max_tokens=500,
-              temperature=0.3,
+              max_tokens=3000,
+              temperature=0.2,
           )
           response_message = response.choices[0].message.content
           base_response["success"] = True

@@ -13,7 +13,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
     """
     final_response = {
         "success": False,
-        "message": "Failed to generate trial eligibility criteria.",
+        "message": "",
         "data": None
     }
 
@@ -94,9 +94,6 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             "exclusionCriteria": generated_exclusion_criteria
         }
 
-        # Categorize response
-        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
-
         user_provided_criteria = {
             "inclusionCriteria": [{
                 "criteria": inclusion_criteria,
@@ -109,6 +106,9 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
                 "source": "User Provided"
             }]
         }
+
+        # Categorize response
+        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
 
         categorizedUserData = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)["data"]
 
