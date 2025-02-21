@@ -3,6 +3,7 @@ from document_retrieval.utils.fetch_trial_filters import fetch_trial_filters
 from document_retrieval.utils.process_filters import process_filters
 from document_retrieval.utils.calculate_weighted_similarity_score import process_similarity_scores
 from database.document_retrieval.store_similar_trials import store_similar_trials
+from database.document_retrieval.update_workflow_status import update_workflow_status
 
 
 async def fetch_similar_documents_extended(documents_search_keys: dict, custom_weights: dict, document_filters: dict, user_data: dict) -> dict:
@@ -104,6 +105,10 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
                                            ecid=user_data["ecid"],
                                            user_input=user_inputs,
                                            similar_trials=trial_documents)
+
+        # Update Job Status
+        status_response = update_workflow_status(ecid=user_data["ecid"],
+                                                 step="trial-services")
 
         print(db_response)
 

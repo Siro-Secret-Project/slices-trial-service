@@ -31,8 +31,8 @@ def store_similar_trials(user_name: str, ecid: str, user_input: dict, similar_tr
             ecid=ecid,
             userInput=user_input,
             similarTrials=similar_trials,
-            created_at=datetime.now(),  # Timestamp for record creation
-            updated_at=datetime.now()   # Timestamp for record update
+            createdAt=datetime.now(),  # Timestamp for record creation
+            updatedAt=datetime.now()   # Timestamp for record update
         ).dict()
 
         # Insert the document into the MongoDB collection using DAO
