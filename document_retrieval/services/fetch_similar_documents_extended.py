@@ -21,23 +21,32 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
 
         # Process each criteria and store the results
         inclusion_criteria_documents = process_criteria(
-            documents_search_keys.get("inclusionCriteria"), module="eligibilityModule"
+            documents_search_keys.get("inclusionCriteria"),
+            module="eligibilityModule",
+            document_search_data=documents_search_keys
         )
         exclusion_criteria_documents = process_criteria(
-            documents_search_keys.get("exclusionCriteria"), module="eligibilityModule"
+            documents_search_keys.get("exclusionCriteria"),
+            module="eligibilityModule",
+            document_search_data=documents_search_keys
         )
         trial_rationale_documents = process_criteria(
-            documents_search_keys.get("rationale")
+            documents_search_keys.get("rationale"),
+            document_search_data=documents_search_keys
         )
         for item in trial_rationale_documents:
             item["module"] = "trialRationale"
 
         trial_objective_documents = process_criteria(
-            documents_search_keys.get("objective"), module="identificationModule"
+            documents_search_keys.get("objective"),
+            module="identificationModule",
+            document_search_data=documents_search_keys
         )
 
         trial_outcomes_documents = process_criteria(
-            documents_search_keys.get("trialOutcomes"), module="outcomesModule"
+            documents_search_keys.get("trialOutcomes"),
+            module="outcomesModule",
+            document_search_data=documents_search_keys
         )
         # Combine all documents and ensure uniqueness by retaining the highest similarity score
         combined_documents = (

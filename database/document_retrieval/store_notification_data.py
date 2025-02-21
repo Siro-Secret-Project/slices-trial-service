@@ -6,7 +6,7 @@ from typing import Dict, Any
 # Initialize MongoDB Data Access Object (DAO)
 mongo_dao = MongoDBDAO()
 
-def store_notification_data(user_name: str, ecid: str, notification_message: str) -> Dict[str, Any]:
+def store_notification_data(ecid: str) -> Dict[str, Any]:
     """
     Stores notification data in the MongoDB database.
 
@@ -14,9 +14,7 @@ def store_notification_data(user_name: str, ecid: str, notification_message: str
     'notifications' collection, and returns a response indicating success or failure.
 
     Args:
-        user_name (str): The username associated with the notification.
-        ecid (str): The ECID (Enterprise Customer ID) associated with the notification.
-        notification_message (str): The content of the notification message.
+        ecid (str): The Job ID associated with the Job Run
 
     Returns:
         Dict[str, Any]: A dictionary containing the following keys:
@@ -40,6 +38,13 @@ def store_notification_data(user_name: str, ecid: str, notification_message: str
     }
 
     try:
+        # Fetch User Name
+        user_name_response =  mongo_dao.find_one(collection_name="similar_trials_results", query={"ecid": ecid}, projection={"userName": 1})
+        user_name = user_name_response["userName"] if user_name_response else "Unknown User"
+
+        # Notification Message
+
+        notification_message = f"Hey {user_name}, your job with ECID: {ecid} has been completed successfully."
         # Create a document instance using the NotificationData model
         document = NotificationData(
             userName=user_name,

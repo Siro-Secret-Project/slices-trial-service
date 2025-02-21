@@ -64,7 +64,7 @@ def query_pinecone_db_extended(query: str, module: str = None) -> dict:
             similarity_score = int(value['max_score'] * 100)
             if similarity_score < 50:
                 continue
-            document_response = fetch_processed_trial_document_with_nct_id(nctId, module)
+            document_response = fetch_processed_trial_document_with_nct_id(nctId)
             if document_response['success'] is True:
                 final_data.append({
                     "nctId": nctId,
