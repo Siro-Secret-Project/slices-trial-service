@@ -15,3 +15,11 @@ class StoreSimilarTrials(BaseModel):
     similarTrials: list
     created_at: datetime
     updated_at: datetime
+
+class NotificationData(BaseModel):
+    ecid: str
+    userName: str
+    notificationMessage: str
+    seen: bool = False
+    created_at: datetime
+    updated_at: datetime
