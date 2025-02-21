@@ -5,6 +5,7 @@ from database.document_retrieval.record_eligibility_criteria_job import record_e
 from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
 from document_retrieval.utils.categorize_eligibility_criteria import categorize_eligibility_criteria
 from utils.generate_object_id import generate_object_id
+from database.document_retrieval.store_notification_data import store_notification_data
 
 
 async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
@@ -13,7 +14,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
     """
     final_response = {
         "success": False,
-        "message": "Failed to generate trial eligibility criteria.",
+        "message": "",
         "data": None
     }
 
@@ -94,9 +95,6 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             "exclusionCriteria": generated_exclusion_criteria
         }
 
-        # Categorize response
-        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
-
         user_provided_criteria = {
             "inclusionCriteria": [{
                 "criteria": inclusion_criteria,
@@ -110,10 +108,15 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             }]
         }
 
+        # Categorize response
+        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
+
         categorizedUserData = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)["data"]
 
         # Store job in DB
         db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
+        notification_response = store_notification_data(ecid=ecid)
+        print(notification_response["message"])
         final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
 
         inclusion_criteria = [ item["criteria"] for item in generated_inclusion_criteria]

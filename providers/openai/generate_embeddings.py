@@ -13,29 +13,29 @@ azure_client = AzureOpenAI(
 )
 
 def generate_embeddings_from_azure_client(text) -> dict:
-  final_response = {
-      "success": False,
-      "message": "Failed to generate embeddings.",
-      "data": None
-  }
-  try:
-        response = azure_client.embeddings.create(
-            input=text,
-            model="embedding_model"
-        )
-        # Extract and flatten the embedding
-        embedding = np.array(json.loads(response.model_dump_json(indent=2))["data"][0]["embedding"])
-        final_response["success"] = True
-        final_response["data"] = embedding.reshape(1, 1536)
-        final_response["message"] = "Successfully generated embeddings."
-        return final_response
-  except Exception as e:
-        print(f"Error generating embeddings: {e}")
-        final_response["success"] = False
-        final_response["message"] = f"Error generating embeddings: {e}"
-        return final_response
+      final_response = {
+          "success": False,
+          "message": "Failed to generate embeddings.",
+          "data": None
+      }
+      try:
+            response = azure_client.embeddings.create(
+                input=text,
+                model="embedding_model"
+            )
+            # Extract and flatten the embedding
+            embedding = np.array(json.loads(response.model_dump_json(indent=2))["data"][0]["embedding"])
+            final_response["success"] = True
+            final_response["data"] = embedding.reshape(1, 1536)
+            final_response["message"] = "Successfully generated embeddings."
+            return final_response
+      except Exception as e:
+            print(f"Error generating embeddings: {e}")
+            final_response["success"] = False
+            final_response["message"] = f"Error generating embeddings: {e}"
+            return final_response
 
-def validate_document_similarity(query: str, similar_documents: list):
+def validate_document_similarity(similar_documents: list, document_search_criteria: dict) -> dict:
       base_response = {
           "success": False,
           "message": None,
@@ -43,42 +43,61 @@ def validate_document_similarity(query: str, similar_documents: list):
       }
       try:
           validate_document_similarity_agent_role = (
-              """
-              You are an AI Assistant tasked with processing input queries and evaluating the similarity of documents 
-              to those queries. 
-              Your goal is to determine whether a document aligns with the input query and assign a similarity score 
-              between 0 and 100 (integer format).
+                """
+                    AI Assistant Role Prompt
+                    
+                    1. Goal:
+                       You are an AI Assistant responsible for evaluating and assigning similarity scores to clinical trial documents 
+                       based on their relevance to a given set of search criteria. Your task is to assess how closely each document 
+                       aligns with the specified search parameters, including inclusion criteria, exclusion criteria, rationale, 
+                       objectives, and outcomes.
+                    
+                       - **Strict Matching for Criteria:** If a document exactly matches a specified inclusion or exclusion criterion 
+                         (e.g., the search requires HbA1c between 7-10, and the document states the same range), it should be 
+                         considered a **100% match**.
+                       - **Conflict Handling:** If a document contains criteria that **directly contradict** the search criteria 
+                         (e.g., an excluded condition appears as an inclusion in the document), it should receive a **score of 0**, 
+                         as opposing criteria take priority.
+                       - **Relevancy-Based Scoring for Other Aspects:** For other sections such as rationale, objectives, and outcomes, 
+                         scoring should be based on their general relevance rather than exact matching.
+                    
+                    2. Return Format:
+                       Your response should be in the following structured JSON format:
+                       json_object:
+                       {
+                           "response": {
+                               "NCT_ID": similarity_score,
+                               "NCT_ID": similarity_score,
+                               "NCT_ID": similarity_score
+                           },
+                           "reasoning": {
+                               "NCT_ID": "Explanation for the assigned score",
+                               "NCT_ID": "Explanation for the assigned score",
+                               "NCT_ID": "Explanation for the assigned score"
+                           }
+                       }
+                """
+          )
 
-              Your data will pertain to medical trials, where the most critical factors for determining document 
-              relevance are **lab values**, **age**, and **specific conditions that are considered in trial like BMI or 
-              some drug**. 
-              Common elements like informed consent should be ignored, as they are not significant for this task.
+          user_input = (
+                f"4. User Inputs: 1. Trail Inclusion Criteria: {document_search_criteria.get('inclusionCriteria', 'N/A')}, "
+                f"2. Trail Exclusion Criteria: {document_search_criteria.get('exclusionCriteria', 'N/A')}, "
+                f"3. Trail Rationale: {document_search_criteria.get('rationale', 'N/A')}, "
+                f"4. Trail Objectives: {document_search_criteria.get('objective', 'N/A')}, "
+                f"5. Trail Outcomes: {document_search_criteria.get('trialOutcomes', 'N/A')}"
+                f"6. Similar Documents: {similar_documents}"
 
-              Respond in the following format:
-              json_object:
-              {
-                "response": {
-                  "NCT_ID": similarity_score,
-                  "NCT_ID": similarity_score,
-                  "NCT_ID": similarity_score,
-                  "NCT_ID": similarity_score
-                }
-              }
-
-              Note: Each NCT_ID represents a unique document ID.
-
-              """
           )
           input_history = [
               {"role": "system", "content": validate_document_similarity_agent_role},
-              {"role": "user", "content": f"Trial Document: {query}, Similar Documents: {similar_documents}"},
+              {"role": "user", "content": user_input},
           ]
           response = azure_client.chat.completions.create(
               model="model-4o",
               response_format={"type": "json_object"},
               messages=input_history,
-              max_tokens=500,
-              temperature=0.3,
+              max_tokens=3000,
+              temperature=0.1,
           )
           response_message = response.choices[0].message.content
           base_response["success"] = True
