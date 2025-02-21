@@ -6,6 +6,7 @@ from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fe
 from document_retrieval.utils.categorize_eligibility_criteria import categorize_eligibility_criteria
 from utils.generate_object_id import generate_object_id
 from database.document_retrieval.store_notification_data import store_notification_data
+from database.document_retrieval.update_workflow_status import update_workflow_status
 
 
 async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
@@ -116,6 +117,9 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         # Store job in DB
         db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
         notification_response = store_notification_data(ecid=ecid)
+        workflow_status_response = update_workflow_status(ecid=ecid,
+                                                          step="similar-criteria")
+        print(workflow_status_response["message"])
         print(notification_response["message"])
         final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
 

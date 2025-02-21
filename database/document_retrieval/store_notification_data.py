@@ -50,8 +50,8 @@ def store_notification_data(ecid: str) -> Dict[str, Any]:
             userName=user_name,
             ecid=ecid,
             notificationMessage=notification_message,
-            created_at=datetime.now(),  # Timestamp for record creation
-            updated_at=datetime.now()    # Timestamp for record update
+            createdAt=datetime.now(),  # Timestamp for record creation
+            updatedAt=datetime.now()    # Timestamp for record update
         ).dict()
 
         # Insert the document into the MongoDB collection using DAO

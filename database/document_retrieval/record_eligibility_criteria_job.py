@@ -34,15 +34,15 @@ def record_eligibility_criteria_job(job_id: str,
         # Check if the document already exists
         existing_doc = mongo_dao.find_one("similar_trials_criteria_results", {"ecid": job_id})
 
-        created_at = existing_doc["created_at"] if existing_doc else datetime.now()
+        created_at = existing_doc["createdAt"] if existing_doc else datetime.now()
 
         # Create a document using the StoreEligibilityCriteria model
         document = StoreEligibilityCriteria(
             ecid=job_id,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
-            created_at=created_at,
-            updated_at=datetime.now(),
+            createdAt=created_at,
+            updatedAt=datetime.now(),
         ).dict()
 
         # Insert or update the document using MongoDBDAO
