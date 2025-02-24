@@ -19,6 +19,7 @@ pinecone-client = "^5.0.1"
 transformers = "^4.48.0"
 scikit-learn = "^1.6.1"
 python-dotenv = "^1.0.1"
+pytz = "^2025.1"
 
 
 [build-system]

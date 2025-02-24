@@ -110,9 +110,19 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         }
 
         # Categorize response
-        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
+        categorizedGeneratedDataResponse = categorize_eligibility_criteria(eligibility_agent, final_data)
+        if categorizedGeneratedDataResponse["success"] is False:
+            print(categorizedGeneratedDataResponse["message"])
+            categorizedGeneratedData = {}
+        else:
+            categorizedGeneratedData = categorizedGeneratedDataResponse["data"]
 
-        categorizedUserData = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)["data"]
+        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)
+        if categorizedUserDataResponse["success"] is False:
+            print(categorizedUserDataResponse["message"])
+            categorizedUserData = {}
+        else:
+            categorizedUserData = categorizedUserDataResponse["data"]
 
         # Store job in DB
         db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
