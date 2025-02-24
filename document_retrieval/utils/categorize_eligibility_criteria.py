@@ -27,4 +27,9 @@ def categorize_eligibility_criteria(eligibility_agent, eligibility_criteria) -> 
                 value["source"] = criteria_item["source"]
         categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Exclusion"].append(value)
 
+    # remove empty classes
+    for key in list(categorized_data.keys()):
+        if not categorized_data[key]["Inclusion"] and not categorized_data[key]["Exclusion"]:
+            del categorized_data[key]
+
     return {"success": True, "data": categorized_data}
