@@ -8,8 +8,9 @@ def process_criteria(criteria: str, document_search_data: dict, module: str = No
     """
     if not criteria:
         return []
-
+    print(f"Pinecone DB Started")
     pinecone_response = query_pinecone_db_extended(query=criteria, module=module)
+    print(f"Pinecone DB Finished")
     for item in pinecone_response["data"]:
         del item["similarity_score"]
 
@@ -18,13 +19,13 @@ def process_criteria(criteria: str, document_search_data: dict, module: str = No
         document_search_criteria=document_search_data
     )
     validity_score = document_validation["data"]["response"]
-    print(validity_score)
 
     # generate a final data list
     final_list = [
         {"nctId": nctId, "similarity_score": score, "module": module} for nctId, score in validity_score.items() if
-        score >= 75
+        score >= 75 and len(str(nctId)) == 11
     ]
+    print(final_list)
 
     return final_list
 
