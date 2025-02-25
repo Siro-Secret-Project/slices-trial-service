@@ -123,34 +123,44 @@ class TrialEligibilityAgent:
             - Eligibility Criteria must be from trial documents only, so each criteria must have a NCT ID related to it.
             """)
         self.filter_role = ("""
-        The Role:
-        You are a agent responsible for filtering the AI generated trial Eligibility Criteria based on the provided 
-        Similarity Score.
-        You will be given AI generated eligibility criteria that will be redundant and you will have to filter them out
-        based on the similarity score.
-
-        The Process:
-        1. Take the remaining criteria and if there are multiple similar criteria like Age related then keep which has the highest similarity score.
-        2. Provide the remaining criteria Ids
-
-        The Inputs:
-        You will be provided with the following inputs:
-        1. Generated Inclusion Criteria - The AI generated Inclusion Criteria.
-        2. Generated Exclusion Criteria - The AI generated Exclusion Criteria.
-        3. Similarity Score - The similarity score of the generated criteria against the user provided criteria.
-        4. ID - The ID of the generated criteria.
-
-        The Output format:
-        You will provide the remaining criteria Ids in the following format:
-        json_object: {
-            "inclusionCriteria": [unique_criteria_id1, unique_criteria_id2],
-            "exclusionCriteria": [unique_criteria_id1, unique_criteria_id2]
-        }
-
-
-
-
-        """)
+            Role:
+                You are an agent responsible for filtering AI-generated trial eligibility criteria.
+                Your task is to process given eligibility criteria (both Inclusion and Exclusion) by splitting any combined statements into individual criteria.
+            
+            Task:
+                - Identify and separate multiple criteria within a single statement.
+                - Return the refined criteria in a structured JSON format.
+            
+            Response Format:
+                The output should be a JSON object with two lists: 
+                - "inclusionCriteria" for criteria that qualify participants.
+                - "exclusionCriteria" for criteria that disqualify participants.
+                json_object{
+                    "inclusionCriteria": ["statement1", "statement2"],
+                    "exclusionCriteria": ["statement1", "statement2"]
+                }
+            
+            Example Input:
+                Inclusion Criteria: Adults, Diabetes type 2, Wide A1C range, Overweight or obese
+                Exclusion Criteria: Kidney disease, heart conditions, Any condition that renders the trial unsuitable for the patient as per investigator's opinion, participation in other trials within 45 days
+            
+            Example Output:
+                {
+                    "inclusionCriteria": [
+                        "Adults",
+                        "Diabetes type 2",
+                        "Wide A1C range",
+                        "Overweight or obese"
+                    ],
+                    "exclusionCriteria": [
+                        "Kidney disease",
+                        "Heart conditions",
+                        "Any condition that renders the trial unsuitable for the patient as per investigator's opinion",
+                        "Participation in other trials within 45 days"
+                    ]
+                }
+            """
+        )
 
     def draft_eligibility_criteria(self, sample_trial_rationale,
                                    similar_trial_documents,
@@ -304,7 +314,7 @@ class TrialEligibilityAgent:
             final_response["message"] = f"Error processing query rationale: {e}"
             return final_response
 
-    def filter_generated_criteria(self, generated_eligibility_criteria) -> dict:
+    def filter_generated_criteria(self, inclusionCriteria, exclusionCriteria) -> dict:
         final_response = {
             "success": False,
             "message": "Failed to filter eligibility criteria",
@@ -312,8 +322,8 @@ class TrialEligibilityAgent:
         }
         try:
             user_input = (
-                f"Generated Inclusion Criteria: {generated_eligibility_criteria['inclusionCriteria']}\n"
-                f"Generated Exclusion Criteria: {generated_eligibility_criteria['exclusionCriteria']}\n"
+                f"Inclusion Criteria: {inclusionCriteria}\n"
+                f"Exclusion Criteria: {exclusionCriteria}\n"
             )
 
             message_list = [
