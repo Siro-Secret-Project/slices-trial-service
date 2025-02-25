@@ -1,9 +1,8 @@
 from fastapi import APIRouter,Response, status
-from document_retrieval.models.routes_models import BaseResponse, GenerateEligibilityCriteria, DocumentFilters, FetchSource
+from document_retrieval.models.routes_models import BaseResponse, GenerateEligibilityCriteria, DocumentFilters
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from document_retrieval.services.generate_trial_eligibility_certeria import generate_trial_eligibility_criteria
 from datetime import datetime
-from database.document_retrieval.fetch_trial_source import fetch_trial_source
 
 router = APIRouter()
 
@@ -36,12 +35,13 @@ async def search_routes_new(request: DocumentFilters, response: Response):
 
         # Extract input for Document Search
         rationale = request.rationale if request.rationale != "" else None
-        objective = request.objective if request.objective != "" else None
+        condition = request.condition if request.condition != "" else None
         inclusion_criteria = request.inclusionCriteria if request.inclusionCriteria != "" else None
         exclusion_criteria = request.exclusionCriteria if request.exclusionCriteria != "" else None
         trial_outcomes = request.efficacyEndpoints if request.efficacyEndpoints != "" else None
+        title = request.title if request.title != "" else None
         # To bo added later
-        # conditions = request.conditions if request.conditions != "" else None
+        # objective = request.objective if request.objective != "" else None
         # interventionType = request.interventionType if request.interventionType != "" else None
         weights = request.weights
 
@@ -49,8 +49,9 @@ async def search_routes_new(request: DocumentFilters, response: Response):
             "inclusionCriteria": inclusion_criteria,
             "exclusionCriteria": exclusion_criteria,
             "rationale": rationale,
-            "objective": objective,
-            "trialOutcomes": trial_outcomes
+            "condition": condition,
+            "trialOutcomes": trial_outcomes,
+            "title": title
         }
 
         # Lambda function to validate and format dates safely
@@ -149,40 +150,6 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
 
     except Exception as e:
         # Handle unexpected errors, log them, and update the base response
-        print(f"Unexpected error: {e}")
-        base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        base_response.message = f"Unexpected error: {e}"
-        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-        return base_response
-
-
-@router.post("/fetch_trail_sources", response_model=BaseResponse)
-async def fetch_trail_source(request: FetchSource, response: Response):
-    base_response = BaseResponse(
-        success=False,
-        status_code=status.HTTP_400_BAD_REQUEST,
-        data=None,
-        message="Failed to fetch data"
-    )
-    try:
-        criteriaID = request.criteriaID
-        target_id = request.target_id
-        ecid = request.ecid
-
-        db_response = fetch_trial_source(ecid=ecid, criteria_id=criteriaID, target_id=target_id)
-        if db_response["success"] is False:
-            base_response.message = db_response["message"]
-            response.status_code = status.HTTP_400_BAD_REQUEST
-            return base_response
-        else:
-            base_response.success = True
-            base_response.message = db_response["message"]
-            base_response.status_code = status.HTTP_200_OK
-            response.status_code = status.HTTP_200_OK
-            base_response.data = db_response["data"]
-            return base_response
-
-    except Exception as e:
         print(f"Unexpected error: {e}")
         base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         base_response.message = f"Unexpected error: {e}"

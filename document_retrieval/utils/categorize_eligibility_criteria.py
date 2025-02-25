@@ -27,7 +27,7 @@ def categorize_eligibility_criteria(eligibility_agent, eligibility_criteria) -> 
                     value["criteria"] = criteria_item["criteria"]
                     value["source"] = criteria_item["source"]
             categorized_data.setdefault(item_class, {"Inclusion": [], "Exclusion": []})["Exclusion"].append(value)
-
+            
         return {"success": True, "message": "Successfully categorized eligibility criteria.", "data": categorized_data}
     except Exception as e:
         print(f"Error occurred while categorizing eligibility criteria: {str(e)}")

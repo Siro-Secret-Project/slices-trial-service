@@ -4,24 +4,6 @@ from providers.openai.generate_embeddings import generate_embeddings_from_azure_
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 
-def scale_modules_to_target(modules, target_percentage):
-    """
-    Scales the module scores such that their weighted sum equals the target percentage.
-
-    Parameters:
-        modules (dict): A dictionary where keys are module names and values are their original scores.
-        target_percentage (float): The desired total percentage after scaling.
-
-    Returns:
-        dict: A dictionary with module names as keys and their scaled percentage values.
-    """
-    total_score = sum(modules.values())
-
-    # Compute scaled percentages
-    scaled_modules = {key: (value / total_score) * target_percentage for key, value in modules.items()}
-
-    return scaled_modules
-
 
 def calculate_weighted_similarity_score(user_input_document: dict, target_document: dict, weights: dict) -> dict:
     """
@@ -42,7 +24,6 @@ def calculate_weighted_similarity_score(user_input_document: dict, target_docume
         "data": None
     }
     try:
-        print(weights)
 
         # Identify modules that should be excluded (i.e., those with None values in user input)
         excluded_modules = [module for module, value in user_input_document.items() if value is None]
@@ -58,7 +39,7 @@ def calculate_weighted_similarity_score(user_input_document: dict, target_docume
         embedded_target_document = {
             module: generate_embeddings_from_azure_client(value)["data"].flatten().tolist()
             for module, value in target_document.items()
-            if module not in excluded_modules and module != "rationale"
+            if module not in excluded_modules
         }
 
         # Compute cosine similarity for each section (excluding 'rationale')
@@ -67,9 +48,6 @@ def calculate_weighted_similarity_score(user_input_document: dict, target_docume
             user_embedding = np.array(embedded_user_input_document[module]).reshape(1, -1)
             target_embedding = np.array(embedded_target_document[module]).reshape(1, -1)
             similarity_scores[module] = cosine_similarity(user_embedding, target_embedding)[0][0]
-
-        # Assign a default similarity score of 1.0 for 'rationale' since it's always present in user input but missing in target
-        similarity_scores["rationale"] = 1.0  # Assume perfect similarity since it's missing in target
 
         # Compute weighted similarity score
         weighted_similarity_score = sum(similarity_scores[module] * weights[module] for module in similarity_scores)
@@ -109,6 +87,7 @@ def process_similarity_scores(target_documents_ids: list, user_input_document: d
         "data": None
     }
     try:
+        print(weights)
         trial_target_document = []  # Store similarity scores for each document
 
         for nctId in target_documents_ids:
@@ -124,8 +103,9 @@ def process_similarity_scores(target_documents_ids: list, user_input_document: d
             target_document = {
                 "inclusionCriteria": fetched_target_document["inclusionCriteria"],
                 "exclusionCriteria": fetched_target_document["exclusionCriteria"],
-                "objective": fetched_target_document["officialTitle"],
-                "trialOutcomes": fetched_target_document["primaryOutcomes"]
+                "title": fetched_target_document["officialTitle"],
+                "trialOutcomes": fetched_target_document["primaryOutcomes"],
+                "condition": fetched_target_document["conditions"]
             }
 
             # Calculate weighted similarity score between user input and target document
@@ -157,3 +137,4 @@ def process_similarity_scores(target_documents_ids: list, user_input_document: d
         final_response["message"] = f"Failed to process weighted similarity score: {e}"
 
     return final_response
+

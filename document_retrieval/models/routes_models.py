@@ -10,8 +10,8 @@ class BaseResponse(BaseModel):
 class WeightsModel(BaseModel):
     inclusionCriteria: float = Field(0, ge=0, le=1)
     exclusionCriteria: float = Field(0, ge=0, le=1)
-    objective: float = Field(0, ge=0, le=1)
-    rationale: float = Field(0, ge=0, le=1)
+    condition: float = Field(0, ge=0, le=1)
+    title: float = Field(0, ge=0, le=1)
     trialOutcomes: float = Field(0, ge=0, le=1)
 
 class DocumentSearch(BaseModel):
@@ -20,6 +20,7 @@ class DocumentSearch(BaseModel):
     rationale: str
     objective: str
     condition: str
+    title: str
     efficacyEndpoints: str
     inclusionCriteria: str
     exclusionCriteria: str
@@ -41,7 +42,3 @@ class DocumentFilters(DocumentSearch):
     countryLogic: Literal["AND", "OR"] = "OR"
     safetyAssessment: Optional[str] = ""
 
-class FetchSource(BaseModel):
-    ecid: str
-    criteriaID: str
-    target_id: list
