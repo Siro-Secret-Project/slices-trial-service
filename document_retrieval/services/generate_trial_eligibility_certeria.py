@@ -96,23 +96,71 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             "exclusionCriteria": generated_exclusion_criteria
         }
 
-        user_provided_criteria = {
-            "inclusionCriteria": [{
-                "criteria": inclusion_criteria,
-                "criteriaID": f"cid_{generate_object_id()}",
-                "source": "User Provided"
-            }],
-            "exclusionCriteria": [{
-                "criteria": exclusion_criteria,
-                "criteriaID": f"cid_{generate_object_id()}",
-                "source": "User Provided"
-            }]
-        }
+        filtered_criteria_response = eligibility_agent.filter_generated_criteria(inclusionCriteria=inclusion_criteria,
+                                                                                 exclusionCriteria=exclusion_criteria)
+        user_provided_criteria = {}
+        if filtered_criteria_response["success"] is False:
+            print(filtered_criteria_response["message"])
+            provided_inclusion_criteria = inclusion_criteria
+            provided_exclusion_criteria = exclusion_criteria
+
+            user_provided_criteria = {
+                "inclusionCriteria": [{
+                    "criteria": provided_inclusion_criteria,
+                    "criteriaID": f"cid_{generate_object_id()}",
+                    "source": {
+                        "User Provided": inclusion_criteria
+                    }
+                }],
+                "exclusionCriteria": [{
+                    "criteria": provided_exclusion_criteria,
+                    "criteriaID": f"cid_{generate_object_id()}",
+                    "source": {
+                        "User Provided": exclusion_criteria
+                    }
+                }]
+            }
+        else:
+            provided_criteria = filtered_criteria_response["data"]
+            provided_inclusion_criteria = []
+            for item in provided_criteria["inclusionCriteria"]:
+                new_item = {
+                    "criteriaID": f"cid_{generate_object_id()}",
+                    "criteria": item,
+                    "source": {
+                        "User Provided": item
+                    }
+                }
+                provided_inclusion_criteria.append(new_item)
+            provided_exclusion_criteria = []
+            for item in provided_criteria["exclusionCriteria"]:
+                new_item = {
+                    "criteriaID": f"cid_{generate_object_id()}",
+                    "criteria": item,
+                    "source": {
+                        "User Provided": exclusion_criteria
+                    }
+                }
+                provided_exclusion_criteria.append(new_item)
+                user_provided_criteria = {
+                    "inclusionCriteria": provided_inclusion_criteria,
+                    "exclusionCriteria": provided_exclusion_criteria
+                }
 
         # Categorize response
-        categorizedGeneratedData = categorize_eligibility_criteria(eligibility_agent, final_data)["data"]
+        categorizedGeneratedDataResponse = categorize_eligibility_criteria(eligibility_agent, final_data)
+        if categorizedGeneratedDataResponse["success"] is False:
+            print(categorizedGeneratedDataResponse["message"])
+            categorizedGeneratedData = {}
+        else:
+            categorizedGeneratedData = categorizedGeneratedDataResponse["data"]
 
-        categorizedUserData = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)["data"]
+        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)
+        if categorizedUserDataResponse["success"] is False:
+            print(categorizedUserDataResponse["message"])
+            categorizedUserData = {}
+        else:
+            categorizedUserData = categorizedUserDataResponse["data"]
 
         # Store job in DB
         db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)

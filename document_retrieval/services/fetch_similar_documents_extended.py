@@ -38,9 +38,9 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         for item in trial_rationale_documents:
             item["module"] = "trialRationale"
 
-        trial_objective_documents = process_criteria(
-            documents_search_keys.get("objective"),
-            module="identificationModule",
+        trial_conditions_documents = process_criteria(
+            documents_search_keys.get("conditions"),
+            module="conditionsModule",
             document_search_data=documents_search_keys
         )
 
@@ -49,13 +49,20 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             module="outcomesModule",
             document_search_data=documents_search_keys
         )
+
+        trial_title_documents = process_criteria(
+            documents_search_keys.get("title"),
+            module="identificationModule",
+            document_search_data=documents_search_keys
+        )
         # Combine all documents and ensure uniqueness by retaining the highest similarity score
         combined_documents = (
             inclusion_criteria_documents +
             exclusion_criteria_documents +
             trial_rationale_documents +
-            trial_objective_documents +
-            trial_outcomes_documents
+            trial_conditions_documents +
+            trial_outcomes_documents +
+            trial_title_documents
         )
         unique_documents = {}
         for doc in combined_documents:
@@ -107,9 +114,8 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
                                            similar_trials=trial_documents)
 
         # Update Job Status
-        status_response = update_workflow_status(ecid=user_data["ecid"],
-                                                 step="trial-services")
-
+        status_response = update_workflow_status(ecid=user_data["ecid"], step="trial-services")
+        print(status_response)
         print(db_response)
 
         final_response["data"] = trial_documents
