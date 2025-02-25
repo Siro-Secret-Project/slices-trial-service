@@ -100,12 +100,16 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             "inclusionCriteria": [{
                 "criteria": inclusion_criteria,
                 "criteriaID": f"cid_{generate_object_id()}",
-                "source": "User Provided"
+                "source": {
+                    "User Provided":inclusion_criteria
+                }
             }],
             "exclusionCriteria": [{
                 "criteria": exclusion_criteria,
                 "criteriaID": f"cid_{generate_object_id()}",
-                "source": "User Provided"
+                "source": {
+                    "User Provided":exclusion_criteria
+                }
             }]
         }
 
