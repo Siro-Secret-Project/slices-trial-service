@@ -70,25 +70,26 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             if nctId not in unique_documents or doc["similarity_score"] > unique_documents[nctId]["similarity_score"]:
                 unique_documents[nctId] = doc
 
-        # filter documents
-        fetch_add_documents_filter_response = fetch_trial_filters(trial_documents=list(unique_documents.values()))
-        if fetch_add_documents_filter_response["success"] is True:
-            trial_documents = fetch_add_documents_filter_response["data"]
-            print(f"Documents length: {len(trial_documents)}")
-            trial_documents = process_filters(documents=trial_documents, filters=document_filters)
-            print(f"Documents length: {len(trial_documents)}")
-            if len(trial_documents) == 0:
-                db_response = store_similar_trials(user_name=user_data["userName"],
-                                                   ecid=user_data["ecid"],
-                                                   user_input=user_inputs,
-                                                   similar_trials=trial_documents)
-                print(db_response)
-                final_response["message"] = "No Documents Found matching criteria."
-                final_response["success"] = True
-                final_response["data"] = []
-                return final_response
-        else:
-            trial_documents = list(unique_documents.values())
+        print(len(unique_documents))
+        # # filter documents
+        # fetch_add_documents_filter_response = fetch_trial_filters(trial_documents=list(unique_documents.values()))
+        # if fetch_add_documents_filter_response["success"] is True:
+        #     trial_documents = fetch_add_documents_filter_response["data"]
+        #     print(f"Documents length: {len(trial_documents)}")
+        #     trial_documents = process_filters(documents=trial_documents, filters=document_filters)
+        #     print(f"Documents length: {len(trial_documents)}")
+        #     if len(trial_documents) == 0:
+        #         db_response = store_similar_trials(user_name=user_data["userName"],
+        #                                            ecid=user_data["ecid"],
+        #                                            user_input=user_inputs,
+        #                                            similar_trials=trial_documents)
+        #         print(db_response)
+        #         final_response["message"] = "No Documents Found matching criteria."
+        #         final_response["success"] = True
+        #         final_response["data"] = []
+        #         return final_response
+        # else:
+        trial_documents = list(unique_documents.values())
 
         # Calculate weighted average for similarity score
         nctIds = [item["nctId"] for item in trial_documents]

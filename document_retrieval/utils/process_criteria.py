@@ -11,21 +11,22 @@ def process_criteria(criteria: str, document_search_data: dict, module: str = No
     print(f"Pinecone DB Started")
     pinecone_response = query_pinecone_db_extended(query=criteria, module=module)
     print(f"Pinecone DB Finished")
-    for item in pinecone_response["data"]:
-        del item["similarity_score"]
 
-    document_validation = validate_document_similarity(
-        similar_documents=pinecone_response["data"],
-        document_search_criteria=document_search_data
-    )
-    validity_score = document_validation["data"]["response"]
+    # document_validation = validate_document_similarity(
+    #     similar_documents=pinecone_response["data"],
+    #     document_search_criteria=document_search_data
+    # )
+    # validity_score = document_validation["data"]["response"]
 
     # generate a final data list
-    final_list = [
-        {"nctId": nctId, "similarity_score": score, "module": module} for nctId, score in validity_score.items() if
-        score >= 75 and len(str(nctId)) == 11
-    ]
-    print(final_list)
+    final_list = []
+    for item in pinecone_response["data"]:
+        new_item = {
+            "nctId": item["nctId"],
+            "module": item["module"],
+            "similarity_score": item["similarity_score"],
+        }
+        final_list.append(new_item)
 
     return final_list
 
