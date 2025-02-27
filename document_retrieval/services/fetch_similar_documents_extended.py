@@ -39,7 +39,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             item["module"] = "trialRationale"
 
         trial_conditions_documents = process_criteria(
-            documents_search_keys.get("conditions"),
+            documents_search_keys.get("condition"),
             module="conditionsModule",
             document_search_data=documents_search_keys
         )
