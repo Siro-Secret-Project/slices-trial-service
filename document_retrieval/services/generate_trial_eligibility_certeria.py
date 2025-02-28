@@ -10,8 +10,7 @@ from utils.generate_object_id import generate_object_id
 from database.document_retrieval.store_notification_data import store_notification_data
 from database.document_retrieval.update_workflow_status import update_workflow_status
 from document_retrieval.utils.categorize_generated_criteria import categorize_generated_criteria
-from document_retrieval.utils.merge_duplicate_values import merge_duplicate_values
-from document_retrieval.utils.fetch_trial_filters import normalize_bmi_ranges
+from document_retrieval.utils.merge_duplicate_values import merge_duplicate_values, normalize_bmi_ranges
 
 
 async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
@@ -32,11 +31,8 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
             return final_response
 
         user_inputs = similar_trials_input_response["data"]["userInput"]
-        trial_rationale = user_inputs.get("rationale", "No rationale provided")
         inclusion_criteria = user_inputs.get("inclusionCriteria", "No inclusion criteria provided")
         exclusion_criteria = user_inputs.get("exclusionCriteria", "No exclusion criteria provided")
-        trial_conditions = user_inputs.get("condition", "No trial conditions provided")
-        trialOutcomes = user_inputs.get("trialOutcomes", "No trial outcomes provided")
 
         trial_documents = similar_trials_input_response["data"]["similarTrials"]
 
@@ -74,14 +70,14 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         # Function to process a batch
         def process_batch(batch):
             response = eligibility_agent.draft_eligibility_criteria(
-                sample_trial_rationale=trial_rationale,
+                sample_trial_rationale=user_inputs.get("rationale", "No rationale provided"),
                 similar_trial_documents=batch,
                 user_provided_inclusion_criteria=inclusion_criteria,
                 user_provided_exclusion_criteria=exclusion_criteria,
-                user_provided_trial_outcome=trialOutcomes,
-                user_provided_trial_conditions=trial_conditions,
-                generated_inclusion_criteria=[],
-                generated_exclusion_criteria=[]
+                user_provided_trial_outcome=user_inputs.get("trialOutcomes", "No trial outcomes provided"),
+                user_provided_trial_conditions=user_inputs.get("condition", "No trial conditions provided"),
+                generated_inclusion_criteria=generated_inclusion_criteria,
+                generated_exclusion_criteria=generated_exclusion_criteria
             )
             if not response["success"]:
                 return {"error": response["message"]}
@@ -92,7 +88,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         batches = [similar_documents[i] for i in range(0, len(similar_documents))]
 
         # Run batches in parallel (10 at a time)
-        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
             future_to_batch = {executor.submit(process_batch, batch): batch for batch in batches}
 
             for future in concurrent.futures.as_completed(future_to_batch):
@@ -104,6 +100,8 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
                 generated_exclusion_criteria.extend(result["exclusionCriteria"])
                 drug_ranges.extend(result["drugRanges"])
                 time_line.extend(result["timeFrame"])
+                print("Completed One batch")
+
 
         print("Finished generating criteria")
 
@@ -113,68 +111,11 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         for item in generated_exclusion_criteria:
             item["criteriaID"] = f"cid_{generate_object_id()}"
 
-        filtered_criteria_response = eligibility_agent.filter_generated_criteria(inclusionCriteria=inclusion_criteria,
-                                                                                 exclusionCriteria=exclusion_criteria)
-        user_provided_criteria = {}
-        if filtered_criteria_response["success"] is False:
-            print(filtered_criteria_response["message"])
-            provided_inclusion_criteria = inclusion_criteria
-            provided_exclusion_criteria = exclusion_criteria
-
-            user_provided_criteria = {
-                "inclusionCriteria": [{
-                    "criteria": provided_inclusion_criteria,
-                    "criteriaID": f"cid_{generate_object_id()}",
-                    "source": {
-                        "User Provided": inclusion_criteria
-                    }
-                }],
-                "exclusionCriteria": [{
-                    "criteria": provided_exclusion_criteria,
-                    "criteriaID": f"cid_{generate_object_id()}",
-                    "source": {
-                        "User Provided": exclusion_criteria
-                    }
-                }]
-            }
-        else:
-            provided_criteria = filtered_criteria_response["data"]
-            provided_inclusion_criteria = []
-            for item in provided_criteria["inclusionCriteria"]:
-                new_item = {
-                    "criteriaID": f"cid_{generate_object_id()}",
-                    "criteria": item,
-                    "source": {
-                        "User Provided": item
-                    }
-                }
-                provided_inclusion_criteria.append(new_item)
-            provided_exclusion_criteria = []
-            for item in provided_criteria["exclusionCriteria"]:
-                new_item = {
-                    "criteriaID": f"cid_{generate_object_id()}",
-                    "criteria": item,
-                    "source": {
-                        "User Provided": exclusion_criteria
-                    }
-                }
-                provided_exclusion_criteria.append(new_item)
-                user_provided_criteria = {
-                    "inclusionCriteria": provided_inclusion_criteria,
-                    "exclusionCriteria": provided_exclusion_criteria
-                }
-
-        # Categorize response
-        # categorizedGeneratedDataResponse = categorize_eligibility_criteria(eligibility_agent, final_data)
-        # if categorizedGeneratedDataResponse["success"] is False:
-        #     print(categorizedGeneratedDataResponse["message"])
-        #     categorizedGeneratedData = {}
-        # else:
-        #     categorizedGeneratedData = categorizedGeneratedDataResponse["data"]
 
         categorizedGeneratedData = categorize_generated_criteria(generated_inclusion_criteria=generated_inclusion_criteria,
                                                                  generated_exclusion_criteria=generated_exclusion_criteria)
-        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, user_provided_criteria)
+        print("Categorized Generated Criteria")
+        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria)
         if categorizedUserDataResponse["success"] is False:
             print(categorizedUserDataResponse["message"])
             categorizedUserData = {}
@@ -184,14 +125,11 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         # Store job in DB
         db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
         notification_response = store_notification_data(ecid=ecid)
-        workflow_status_response = update_workflow_status(ecid=ecid,
-                                                          step="similar-criteria")
+        workflow_status_response = update_workflow_status(ecid=ecid, step="similar-criteria")
+
         print(workflow_status_response["message"])
         print(notification_response["message"])
         final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
-
-        inclusion_criteria = [ item["criteria"] for item in generated_inclusion_criteria]
-        exclusion_criteria = [ item["criteria"] for item in generated_exclusion_criteria]
 
         # Merge Duplicates Values
         drug_ranges = normalize_bmi_ranges(drug_ranges)
@@ -213,11 +151,11 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
 
             # Prepare final response
         model_generated_eligibility_criteria = {
-            "inclusionCriteria": inclusion_criteria,
-            "exclusionCriteria": exclusion_criteria,
+            "inclusionCriteria": [ item["criteria"] for item in generated_inclusion_criteria],
+            "exclusionCriteria": [ item["criteria"] for item in generated_exclusion_criteria],
             "categorizedData": categorizedGeneratedData,
             "userCategorizedData": categorizedUserData,
-            "metrics": metrics_data
+            "metrics": metrics_data["key"]
         }
 
         final_response["data"] = model_generated_eligibility_criteria

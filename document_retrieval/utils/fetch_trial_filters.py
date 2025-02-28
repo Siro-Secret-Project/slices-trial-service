@@ -1,5 +1,4 @@
 from database.document_retrieval.fetch_preprocessed_trial_document_with_nct_id import fetch_preprocessed_trial_document_with_nct_id
-import re
 
 def fetch_trial_filters(trial_documents: list) -> dict:
     final_response = {
@@ -58,36 +57,3 @@ def fetch_trial_filters(trial_documents: list) -> dict:
         final_response["message"] = f"Failed to filter trials by country: {e}"
 
     return final_response
-
-
-def extract_timeframes_and_text(text):
-    pattern = r'timeFrame\s*-\s*(.*?)(?=measure|$)'
-    matches = re.findall(pattern, text, re.DOTALL)
-
-    extracted_data = [match.strip() for match in matches]
-
-    return extracted_data
-
-
-def normalize_bmi_ranges(data):
-    updated_data = []
-
-    for entry in data:
-        bmi_value = entry["value"]
-
-        # Convert "BMI X - 44.5" -> "BMI <= 44.5"
-        match_upper = re.match(r'BMI X\s*-\s*(\d+\.?\d*)', bmi_value)
-        if match_upper:
-            normalized_value = f'BMI <= {match_upper.group(1)}'
-        else:
-            # Convert "BMI 30 - X" -> "BMI >= 30"
-            match_lower = re.match(r'BMI (\d+\.?\d*)\s*-\s*X', bmi_value)
-            if match_lower:
-                normalized_value = f'BMI >= {match_lower.group(1)}'
-            else:
-                # Keep original value if no transformation is needed
-                normalized_value = bmi_value
-
-        updated_data.append({"value": normalized_value, "count": entry["count"], "source": entry["source"]})
-
-    return updated_data
