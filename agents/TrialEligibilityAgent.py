@@ -1,58 +1,158 @@
 import re
 import json
 from document_retrieval.utils import prompts
-from providers.openai.openai_connection import OpenAIClient
+from typing import Dict, List
 
 
 class TrialEligibilityAgent:
-    def __init__(self, azure_client, model="model-4o", max_tokens=4000, temperature=0.2):
+    def __init__(self, openai_client, response_format: dict):
         """
         Initializes the TrialEligibilityAgent class.
 
         Parameters:
-            azure_client: The Azure client instance to communicate with the AI model.
-            model (str): The AI model to use for processing.
-            max_tokens (int): The maximum number of tokens for the response.
-            temperature (float): The randomness level for the response.
+            openai_client: The OpenAI client instance to communicate with the AI model.
+            response_format: The format of the response from OpenAI.
         """
-        self.azure_client = azure_client
-        self.model = model
-        self.max_tokens = max_tokens
-        self.temperature = temperature
+        self.openai_client = openai_client
         self.categorisation_role = prompts.categorisation_role
         self.pattern = r'timeFrame\s*-\s*(.*?)(?=measure|$)'
         self.medical_writer_agent_role = prompts.medical_writer_agent_role
         self.filter_role = prompts.filter_role
+        self.response_format = response_format
 
-    def draft_eligibility_criteria(self, sample_trial_rationale,
-                                   similar_trial_documents,
-                                   user_provided_inclusion_criteria,
-                                   user_provided_exclusion_criteria,
-                                   user_provided_trial_conditions,
-                                   user_provided_trial_outcome,
-                                   generated_inclusion_criteria,
-                                   generated_exclusion_criteria, ):
+    def categorise_eligibility_criteria(self, eligibility_criteria: Dict) -> Dict:
         """
-        Drafts comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
+        Categorizes comprehensive inclusion and exclusion criteria for a medical trial based on provided inputs.
 
-        Parameters:
+        Args:
+            eligibility_criteria (Dict): The eligibility criteria for the medical trial.
+
+        Returns:
+            Dict: A dictionary containing:
+                - success (bool): Indicates if the process was successful.
+                - message (str): A descriptive message about the process outcome.
+                - data (Dict): A dictionary containing:
+                    - inclusionCriteria (List): Categorized inclusion criteria.
+                    - exclusionCriteria (List): Categorized exclusion criteria.
+        """
+        # Initialize the final response structure
+        final_response = {
+            "success": False,
+            "message": "Failed to categorize eligibility criteria",
+            "data": None
+        }
+
+        try:
+            # Construct the user input message for the categorisation agent
+            user_input = f"Medical Trial Eligibility Criteria: {eligibility_criteria}"
+
+            # Categorize criteria using the AI model
+            inclusion_criteria, exclusion_criteria = self._generate_criteria_with_ai(user_input=user_input,
+                                                                                     system_prompt=self.categorisation_role)
+
+            # Prepare the final data structure
+            final_data = {
+                "inclusionCriteria": inclusion_criteria,
+                "exclusionCriteria": exclusion_criteria
+            }
+
+            # Update the final response
+            final_response["data"] = final_data
+            final_response["success"] = True
+            final_response["message"] = "Successfully categorized eligibility criteria"
+
+        except Exception as e:
+            # Handle any unexpected errors
+            final_response["message"] = f"Error processing eligibility criteria: {e}"
+
+        return final_response
+
+
+    def filter_generated_criteria(self, inclusionCriteria: List[str], exclusionCriteria: List[str]) -> dict:
+        """
+        Filters the generated inclusion and exclusion criteria using an AI model.
+
+        This method sends the provided inclusion and exclusion criteria to an AI model
+        for filtering and returns the filtered results in a structured format.
+
+        Args:
+            inclusionCriteria (List[str]): A list of generated inclusion criteria to be filtered.
+            exclusionCriteria (List[str]): A list of generated exclusion criteria to be filtered.
+
+        Returns:
+            dict: A dictionary containing:
+                - success (bool): Indicates whether the filtering process was successful.
+                - message (str): A descriptive message about the process outcome.
+                - data (dict): The filtered criteria returned by the AI model.
+        """
+        # Initialize the final response structure
+        final_response = {
+            "success": False,
+            "message": "Failed to filter eligibility criteria",
+            "data": None
+        }
+
+        try:
+            # Construct the user input message for the AI model
+            user_input = (
+                f"Inclusion Criteria: {inclusionCriteria}\n"
+                f"Exclusion Criteria: {exclusionCriteria}\n"
+            )
+
+            # Prepare the message list for the AI model
+            message_list = [
+                {"role": "system", "content": self.filter_role},  # System role defining the AI's function
+                {"role": "user", "content": user_input}  # User input containing the criteria
+            ]
+
+            # Send the request to the AI model and get the response
+            response = self.openai_client.generate_text(messages=message_list, response_format=self.response_format)
+
+            # Parse the AI-generated JSON response
+            json_response = json.loads(response["data"].choices[0].message.content)
+
+            # Update the final response with the filtered data
+            final_response["data"] = json_response
+            final_response["success"] = True
+            final_response["message"] = "Successfully filtered eligibility criteria"
+
+            return final_response
+
+        except Exception as e:
+            # Handle any unexpected errors during the filtering process
+            final_response["message"] = f"Error filtering criteria: {e}"
+            return final_response
+
+
+    def draft_eligibility_criteria(self, sample_trial_rationale: str, similar_trial_documents: Dict,
+                                   user_provided_inclusion_criteria: str, user_provided_exclusion_criteria: str,
+                                   user_provided_trial_conditions: str, user_provided_trial_outcome: str,
+                                   generated_inclusion_criteria: List[str],
+                                   generated_exclusion_criteria: List[str]) -> Dict:
+        """
+        Drafts comprehensive inclusion and exclusion criteria for a medical trial based on provided inputs.
+
+        Args:
             sample_trial_rationale (str): The overall rationale for the medical trial.
-            similar_trial_documents (dict): A similar document from a database.
+            similar_trial_documents (Dict): A similar document from a database.
             user_provided_inclusion_criteria (str): The user-provided inclusion criteria.
             user_provided_exclusion_criteria (str): The user-provided exclusion criteria.
             user_provided_trial_conditions (str): The trial conditions as provided by the user.
             user_provided_trial_outcome (str): The expected outcome of the trial as provided by the user.
-            generated_exclusion_criteria (list): A list of generated exclusion criteria.
-            generated_inclusion_criteria (list): A list of generated inclusion criteria.
+            generated_inclusion_criteria (List[str]): A list of generated inclusion criteria.
+            generated_exclusion_criteria (List[str]): A list of generated exclusion criteria.
 
         Returns:
-            dict: A dictionary containing:
+            Dict: A dictionary containing:
                 - success (bool): Indicates if the process was successful.
                 - message (str): A descriptive message about the process outcome.
-                - data (dict): A dictionary containing:
-                    - inclusionCriteria (list): Extracted inclusion criteria.
-                    - exclusionCriteria (list): Extracted exclusion criteria.
+                - data (Dict): A dictionary containing:
+                    - inclusionCriteria (List): Extracted inclusion criteria.
+                    - exclusionCriteria (List): Extracted exclusion criteria.
+                    - timeFrame (List): Extracted time frame metrics.
+                    - drugRanges (List): Extracted drug range metrics.
         """
+        # Initialize the final response structure
         final_data = {
             "inclusionCriteria": [],
             "exclusionCriteria": [],
@@ -66,187 +166,193 @@ class TrialEligibilityAgent:
         }
 
         try:
-            inclusion_criteria = []
-            exclusion_criteria = []
+            # Construct the user input message for the medical writer agent
+            user_input = self._construct_user_input(sample_trial_rationale, similar_trial_documents,
+                                                    user_provided_inclusion_criteria, user_provided_exclusion_criteria,
+                                                    user_provided_trial_conditions, user_provided_trial_outcome,
+                                                    generated_inclusion_criteria, generated_exclusion_criteria)
 
-            # Constructing the user input message for the medical writer agent
-            user_input = f"""
-                Medical Trial Rationale: {sample_trial_rationale}
-                Similar/Existing Medical Trial Document: {similar_trial_documents}
-                User Provided Inclusion Criteria: {user_provided_inclusion_criteria}
-                User Provided Exclusion Criteria: {user_provided_exclusion_criteria}
-                Trial Conditions: {user_provided_trial_conditions}
-                Trial Outcomes: {user_provided_trial_outcome},
-                Already Generated Inclusion Criteria: {generated_inclusion_criteria},
-                Already Exclusion Criteria: {generated_exclusion_criteria}
-            """
+            # Generate criteria using the AI model
+            inclusion_criteria, exclusion_criteria = self._generate_criteria_with_ai(user_input,
+                                                                                     self.medical_writer_agent_role)
 
-            # Creating a message list for the Azure AI model
-            message_list = [
-                {"role": "system", "content": self.medical_writer_agent_role},  # System role defining AI's function
-                {"role": "user", "content": user_input}  # User input including trial details
-            ]
+            # Extract additional metrics from similar trial documents
+            drug_metrics = self._extract_drug_metrics(similar_trial_documents)
+            timeframe_metrics = self._extract_timeframe_metrics(similar_trial_documents)
 
-            try:
-                openai_client = OpenAIClient()
-                response_format = {"type": "json_object"}
+            # Prepare the final data structure
+            final_data = self._prepare_final_data(inclusion_criteria, exclusion_criteria, timeframe_metrics,
+                                                  drug_metrics, similar_trial_documents)
 
-                # Sending the request to Azure AI chat model
-                response = openai_client.generate_text(messages=message_list, response_format=response_format)
-
-                # Parsing the AI-generated JSON response
-                json_response = json.loads(response["data"].choices[0].message.content)
-
-                # Extracting inclusion and exclusion criteria from the response
-                inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
-                exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
-
-                # Extract Metrics
-                message_list = [
-                    {"role": "system", "content": prompts.values_count_prompt},
-                    {"role": "user", "content": f"{similar_trial_documents}"}
-                ]
-
-                metrics_response = openai_client.generate_text(messages=message_list, response_format=response_format)
-
-
-                drug_output = json.loads(metrics_response["data"].choices[0].message.content)
-
-                primary_outcomes = similar_trial_documents["document"]["primaryOutcomes"]
-                timeline = self.extract_timeframes_and_text(primary_outcomes)
-                time_line_output = [
-                    {
-                        "nctId": similar_trial_documents["nctId"],
-                        "timeLine": timeline
-                    }
-                ]
-                messages = [
-                    {"role": "system", "content": prompts.timeframe_count_prompt},
-                    {"role": "user", "content": f"{time_line_output}"}
-                ]
-
-                timeframe_response = openai_client.generate_text(messages=messages, response_format=response_format)
-                timeframe_output = json.loads(timeframe_response["data"].choices[0].message.content)
-
-                # Preparing final response data
-                for item in inclusion_criteria:
-                    source_statement = item["source"]
-                    item["source"] = {
-                        similar_trial_documents["nctId"]: source_statement
-                    }
-                for item in exclusion_criteria:
-                    source_statement = item["source"]
-                    item["source"] = {
-                        similar_trial_documents["nctId"]: source_statement
-                    }
-
-                final_data = {
-                    "inclusionCriteria": inclusion_criteria,
-                    "exclusionCriteria": exclusion_criteria,
-                    "timeFrame": timeframe_output["response"],
-                    "drugRanges": drug_output["response"]
-                }
-
-            except Exception as e:
-                print(f"Error processing AI response: {e}")  # Logging error in AI response processing
-
+            # Update the final response
             final_response["data"] = final_data
             final_response["success"] = True
             final_response["message"] = "Successfully drafted eligibility criteria"
-            return final_response
 
         except Exception as e:
-            # Handling any unexpected errors
+            # Handle any unexpected errors
             final_response["message"] = f"Error processing query rationale: {e}"
-            return final_response
 
-    def categorise_eligibility_criteria(self, eligibility_criteria):
+        return final_response
+
+    def _construct_user_input(self, sample_trial_rationale: str, similar_trial_documents: Dict,
+                              user_provided_inclusion_criteria: str, user_provided_exclusion_criteria: str,
+                              user_provided_trial_conditions: str, user_provided_trial_outcome: str,
+                              generated_inclusion_criteria: List[str], generated_exclusion_criteria: List[str]) -> str:
         """
-        Categorise comprehensive Inclusion and Exclusion Criteria for a medical trial based on provided inputs.
+        Constructs the user input message for the medical writer agent.
 
-        Parameters:
-            eligibility_criteria: Eligibility criteria for medical trial.
+        Args:
+            sample_trial_rationale (str): The overall rationale for the medical trial.
+            similar_trial_documents (Dict): A similar document from a database.
+            user_provided_inclusion_criteria (str): The user-provided inclusion criteria.
+            user_provided_exclusion_criteria (str): The user-provided exclusion criteria.
+            user_provided_trial_conditions (str): The trial conditions as provided by the user.
+            user_provided_trial_outcome (str): The expected outcome of the trial as provided by the user.
+            generated_inclusion_criteria (List[str]): A list of generated inclusion criteria.
+            generated_exclusion_criteria (List[str]): A list of generated exclusion criteria.
 
         Returns:
-            dict: A dictionary containing inclusion and exclusion criteria.
+            str: The constructed user input message.
         """
-        final_response = {
-            "success": False,
-            "message": "failed to draft eligibility criteria",
-            "data": None
-        }
-        try:
-            inclusion_criteria = []
-            exclusion_criteria = []
+        print("Constructing user input")
+        print(self.pattern)
+        return f"""
+            Medical Trial Rationale: {sample_trial_rationale}
+            Similar/Existing Medical Trial Document: {similar_trial_documents}
+            User Provided Inclusion Criteria: {user_provided_inclusion_criteria}
+            User Provided Exclusion Criteria: {user_provided_exclusion_criteria}
+            Trial Conditions: {user_provided_trial_conditions}
+            Trial Outcomes: {user_provided_trial_outcome},
+            Already Generated Inclusion Criteria: {generated_inclusion_criteria},
+            Already Exclusion Criteria: {generated_exclusion_criteria}
+        """
 
-            user_input = f"""
-                Medical Trial Eligibility Criteria: {eligibility_criteria}
-            """
+    def _generate_criteria_with_ai(self, user_input: str, system_prompt: str) -> tuple:
+        """
+        Generates inclusion and exclusion criteria using the AI model.
 
-            message_list = [
-                {"role": "system", "content": self.categorisation_role},
-                {"role": "user", "content": user_input}
-            ]
+        Args:
+            user_input (str): The constructed user input message.
+            system_prompt (str): The system prompt.
 
-            try:
-                openai_client = OpenAIClient()
-                response = openai_client.generate_text(messages=message_list, response_format={"type": "json_object"})
+        Returns:
+            tuple: A tuple containing two lists:
+                - inclusion_criteria (List): Generated inclusion criteria.
+                - exclusion_criteria (List): Generated exclusion criteria.
+        """
+        message_list = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input}
+        ]
 
-                json_response = json.loads(response["data"].choices[0].message.content)
-                inclusion_criteria.extend(json_response.get("inclusionCriteria", []))
-                exclusion_criteria.extend(json_response.get("exclusionCriteria", []))
+        # Send the request to the AI model
+        str_criteria_response = self.openai_client.generate_text(messages=message_list,
+                                                                 response_format=self.response_format)
+        json_criteria_response = json.loads(str_criteria_response["data"].choices[0].message.content)
 
+        # Extract inclusion and exclusion criteria from the response
+        inclusion_criteria = json_criteria_response.get("inclusionCriteria", [])
+        exclusion_criteria = json_criteria_response.get("exclusionCriteria", [])
 
-            except Exception as e:
-                print(f"Error processing query rationale: {e}")
+        return inclusion_criteria, exclusion_criteria
 
-            final_data = {
-                "inclusionCriteria": inclusion_criteria,
-                "exclusionCriteria": exclusion_criteria
+    def _extract_drug_metrics(self, similar_trial_documents: Dict) -> List:
+        """
+        Extracts drug metrics from similar trial documents.
+
+        Args:
+            similar_trial_documents (Dict): A similar document from a database.
+
+        Returns:
+            List: A list of extracted drug metrics.
+        """
+        message_list = [
+            {"role": "system", "content": prompts.values_count_prompt},
+            {"role": "user", "content": f"{similar_trial_documents}"}
+        ]
+
+        str_drug_metrics_response = self.openai_client.generate_text(messages=message_list,
+                                                                     response_format=self.response_format)
+        json_drug_metrics_output = json.loads(str_drug_metrics_response["data"].choices[0].message.content)
+        return json_drug_metrics_output.get("response", [])
+
+    def _extract_timeframe_metrics(self, similar_trial_documents: Dict) -> List:
+        """
+        Extracts timeframe metrics from similar trial documents.
+
+        Args:
+            similar_trial_documents (Dict): A similar document from a database.
+
+        Returns:
+            List: A list of extracted timeframe metrics.
+        """
+        primary_outcomes = similar_trial_documents["document"]["primaryOutcomes"]
+        primary_outcomes_timeline = self._extract_timeframes_and_text(primary_outcomes)
+        time_line_output = [
+            {
+                "nctId": similar_trial_documents["nctId"],
+                "timeLine": primary_outcomes_timeline
             }
-            final_response["data"] = final_data
-            final_response["success"] = True
-            final_response["message"] = "Successfully draft eligibility criteria"
-            return final_response
-        except Exception as e:
-            final_response["message"] = f"Error processing query rationale: {e}"
-            return final_response
+        ]
 
-    def filter_generated_criteria(self, inclusionCriteria, exclusionCriteria) -> dict:
-        final_response = {
-            "success": False,
-            "message": "Failed to filter eligibility criteria",
-            "data": None
+        messages = [
+            {"role": "system", "content": prompts.timeframe_count_prompt},
+            {"role": "user", "content": f"{time_line_output}"}
+        ]
+
+        str_timeframe_response = self.openai_client.generate_text(messages=messages,
+                                                                  response_format=self.response_format)
+        json_timeframe_output = json.loads(str_timeframe_response["data"].choices[0].message.content)
+        return json_timeframe_output.get("response", [])
+
+    def _prepare_final_data(self, inclusion_criteria: List, exclusion_criteria: List,
+                            timeframe_metrics: List, drug_metrics: List, similar_trial_documents: Dict) -> Dict:
+        """
+        Prepares the final data structure for the response.
+
+        Args:
+            inclusion_criteria (List): Generated inclusion criteria.
+            exclusion_criteria (List): Generated exclusion criteria.
+            timeframe_metrics (List): Extracted timeframe metrics.
+            drug_metrics (List): Extracted drug metrics.
+            similar_trial_documents (Dict): A similar document from a database.
+
+        Returns:
+            Dict: The final data structure containing all extracted and generated criteria.
+        """
+        print("Preparing final response...")
+        print(self.response_format)
+
+        # Add source information to inclusion and exclusion criteria
+        for item in inclusion_criteria:
+            source_statement = item["source"]
+            item["source"] = {similar_trial_documents["nctId"]: source_statement}
+
+        for item in exclusion_criteria:
+            source_statement = item["source"]
+            item["source"] = {similar_trial_documents["nctId"]: source_statement}
+
+        return {
+            "inclusionCriteria": inclusion_criteria,
+            "exclusionCriteria": exclusion_criteria,
+            "timeFrame": timeframe_metrics,
+            "drugRanges": drug_metrics
         }
-        try:
-            user_input = (
-                f"Inclusion Criteria: {inclusionCriteria}\n"
-                f"Exclusion Criteria: {exclusionCriteria}\n"
-            )
 
-            message_list = [
-                {"role": "system", "content": self.filter_role},
-                {"role": "user", "content": user_input}
-            ]
-            print(message_list)
+    def _extract_timeframes_and_text(self, text: str) -> list:
+        """
+            Extracts timeframes and text from primary outcomes.
+            Args:
+                text (str): A str of primary outcomes from the trial document.
 
-            openai_client = OpenAIClient()
-            response = openai_client.generate_text(messages=message_list, response_format={"type": "json_object"})
-
-            json_response = json.loads(response["data"].choices[0].message.content)
-
-            final_response["data"] = json_response
-            final_response["success"] = True
-            final_response["message"] = "Successfully filtered eligibility criteria"
-            return final_response
-
-        except Exception as e:
-            final_response["message"] = f"Error filtering criteria: {e}"
-            return final_response
-
-    def extract_timeframes_and_text(self, text: str) -> list:
+            Returns:
+                List: A list of extracted timeframes and text.
+        """
         matches = re.findall(self.pattern, text, re.DOTALL)
 
         extracted_data = [match.strip() for match in matches]
 
         return extracted_data
+
+

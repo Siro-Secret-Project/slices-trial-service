@@ -1,7 +1,8 @@
 import concurrent.futures
 from collections import defaultdict
+from typing import Dict, List, Any
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
-from providers.openai.generate_embeddings import azure_client
+from providers.openai.openai_connection import OpenAIClient
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
@@ -13,10 +14,95 @@ from document_retrieval.utils.categorize_generated_criteria import categorize_ge
 from document_retrieval.utils.merge_duplicate_values import merge_duplicate_values, normalize_bmi_ranges
 
 
-async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
-    """
-    Generate trial eligibility criteria in batches of 2 documents.
-    """
+def fetch_user_inputs(ecid: str) -> Dict[str, Any]:
+    """Fetch user inputs from the database."""
+    response = fetch_similar_trials_inputs_with_ecid(ecid=ecid)
+    if not response["success"]:
+        raise ValueError(response["message"])
+    return response["data"]
+
+
+def prepare_similar_documents(trial_documents: List[Dict[str, Any]], trail_documents_ids: List[str]) -> List[Dict[str, Any]]:
+    """Prepare and sort similar trial documents."""
+    similar_documents = []
+    for item in trial_documents:
+        nct_id = item["nctId"]
+        if nct_id in trail_documents_ids:
+            similarity_score = item["similarity_score"]
+            doc = fetch_processed_trial_document_with_nct_id(nct_id=nct_id)["data"]
+            similar_documents.append({
+                "nctId": nct_id,
+                "similarity_score": similarity_score,
+                "document": {
+                    "title": doc["officialTitle"],
+                    "inclusionCriteria": doc["inclusionCriteria"],
+                    "exclusionCriteria": doc["exclusionCriteria"],
+                    "primaryOutcomes": doc["primaryOutcomes"]
+                }
+            })
+    similar_documents.sort(key=lambda x: x["similarity_score"], reverse=True)
+    return similar_documents
+
+
+def process_batch(batch: Dict[str, Any], eligibility_agent: TrialEligibilityAgent, user_inputs: Dict[str, Any],
+                 generated_inclusion_criteria: List[Any], generated_exclusion_criteria: List[Any]) -> Dict[str, Any]:
+    """Process a batch of similar trial documents."""
+    response = eligibility_agent.draft_eligibility_criteria(
+        sample_trial_rationale=user_inputs.get("rationale", "No rationale provided"),
+        similar_trial_documents=batch,
+        user_provided_inclusion_criteria=user_inputs.get("inclusionCriteria", "No inclusion criteria provided"),
+        user_provided_exclusion_criteria=user_inputs.get("exclusionCriteria", "No exclusion criteria provided"),
+        user_provided_trial_outcome=user_inputs.get("trialOutcomes", "No trial outcomes provided"),
+        user_provided_trial_conditions=user_inputs.get("condition", "No trial conditions provided"),
+        generated_inclusion_criteria=generated_inclusion_criteria,
+        generated_exclusion_criteria=generated_exclusion_criteria
+    )
+    if not response["success"]:
+        return {"error": response["message"]}
+    return response["data"]
+
+
+def assign_unique_ids(criteria_list: List[Dict[str, Any]]) -> None:
+    """Assign unique IDs to criteria items."""
+    for item in criteria_list:
+        item["criteriaID"] = f"cid_{generate_object_id()}"
+
+
+def categorize_and_merge_data(generated_inclusion_criteria: List[Dict[str, Any]],
+                             generated_exclusion_criteria: List[Dict[str, Any]],
+                             drug_ranges: List[Dict[str, Any]], time_line: List[Dict[str, Any]],
+                             eligibility_agent: TrialEligibilityAgent, inclusion_criteria: str, exclusion_criteria: str) -> Dict[str, Any]:
+    """Categorize and merge generated and user data."""
+    categorized_generated_data = categorize_generated_criteria(
+        generated_inclusion_criteria=generated_inclusion_criteria,
+        generated_exclusion_criteria=generated_exclusion_criteria
+    )
+    categorized_user_data_response = categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria)
+    categorized_user_data = categorized_user_data_response["data"] if categorized_user_data_response["success"] else {}
+
+    drug_ranges = normalize_bmi_ranges(drug_ranges)
+    drug_ranges = merge_duplicate_values(drug_ranges)
+    time_line = merge_duplicate_values(time_line)
+
+    metrics_data = defaultdict(lambda: {"hba1c": [], "bmi": [], "timeline": []})
+    for item in drug_ranges:
+        value = item["value"].lower()
+        if "hba1c" in value:
+            metrics_data["key"]["hba1c"].append(item)
+        else:
+            metrics_data["key"]["bmi"].append(item)
+    for item in time_line:
+        metrics_data["key"]["timeline"].append(item)
+
+    return {
+        "categorized_generated_data": categorized_generated_data,
+        "categorized_user_data": categorized_user_data,
+        "metrics_data": metrics_data["key"]
+    }
+
+
+async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: List[str]) -> Dict[str, Any]:
+    """Generate trial eligibility criteria in batches of 2 documents."""
     final_response = {
         "success": False,
         "message": "",
@@ -24,72 +110,24 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
     }
 
     try:
-        # Fetch User Inputs from DB
-        similar_trials_input_response = fetch_similar_trials_inputs_with_ecid(ecid=ecid)
-        if similar_trials_input_response["success"] is False:
-            final_response["message"] = similar_trials_input_response["message"]
-            return final_response
+        user_inputs_data = fetch_user_inputs(ecid)
+        user_inputs = user_inputs_data["userInput"]
+        trial_documents = user_inputs_data["similarTrials"]
 
-        user_inputs = similar_trials_input_response["data"]["userInput"]
-        inclusion_criteria = user_inputs.get("inclusionCriteria", "No inclusion criteria provided")
-        exclusion_criteria = user_inputs.get("exclusionCriteria", "No exclusion criteria provided")
+        similar_documents = prepare_similar_documents(trial_documents, trail_documents_ids)
 
-        trial_documents = similar_trials_input_response["data"]["similarTrials"]
+        openai_client = OpenAIClient()
+        eligibility_agent = TrialEligibilityAgent(openai_client, response_format={"type": "json_object"})
 
-        # Process and prepare similar trial documents
-        similar_documents = []
-        for item in trial_documents:
-            nct_id = item["nctId"]
-            if nct_id in trail_documents_ids:
-                similarity_score = item["similarity_score"]
-                doc = fetch_processed_trial_document_with_nct_id(nct_id=nct_id)["data"]
-                similar_documents.append({
-                    "nctId": nct_id,
-                    "similarity_score": similarity_score,
-                    "document": {
-                        "title": doc["officialTitle"],
-                        "inclusionCriteria": doc["inclusionCriteria"],
-                        "exclusionCriteria": doc["exclusionCriteria"],
-                        "primaryOutcomes": doc["primaryOutcomes"]
-                    }
-                })
-
-        # Sort documents by similarity score
-        similar_documents.sort(key=lambda x: x["similarity_score"], reverse=True)
-
-        # Initialize the TrialEligibilityAgent
-        eligibility_agent = TrialEligibilityAgent(azure_client, max_tokens=4000)
-
-        print("Started generating criteria")
-        # Initialize lists to store generated criteria
         generated_inclusion_criteria = []
         generated_exclusion_criteria = []
         drug_ranges = []
         time_line = []
 
-        # Function to process a batch
-        def process_batch(batch):
-            response = eligibility_agent.draft_eligibility_criteria(
-                sample_trial_rationale=user_inputs.get("rationale", "No rationale provided"),
-                similar_trial_documents=batch,
-                user_provided_inclusion_criteria=inclusion_criteria,
-                user_provided_exclusion_criteria=exclusion_criteria,
-                user_provided_trial_outcome=user_inputs.get("trialOutcomes", "No trial outcomes provided"),
-                user_provided_trial_conditions=user_inputs.get("condition", "No trial conditions provided"),
-                generated_inclusion_criteria=generated_inclusion_criteria,
-                generated_exclusion_criteria=generated_exclusion_criteria
-            )
-            if not response["success"]:
-                return {"error": response["message"]}
-
-            return response["data"]
-
-        # Process documents in batches of 1
         batches = [similar_documents[i] for i in range(0, len(similar_documents))]
 
-        # Run batches in parallel (10 at a time)
         with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            future_to_batch = {executor.submit(process_batch, batch): batch for batch in batches}
+            future_to_batch = {executor.submit(process_batch, batch, eligibility_agent, user_inputs, generated_inclusion_criteria, generated_exclusion_criteria): batch for batch in batches}
 
             for future in concurrent.futures.as_completed(future_to_batch):
                 result = future.result()
@@ -100,68 +138,31 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
                 generated_exclusion_criteria.extend(result["exclusionCriteria"])
                 drug_ranges.extend(result["drugRanges"])
                 time_line.extend(result["timeFrame"])
-                print("Completed One batch")
 
+        assign_unique_ids(generated_inclusion_criteria)
+        assign_unique_ids(generated_exclusion_criteria)
 
-        print("Finished generating criteria")
+        categorized_data = categorize_and_merge_data(
+            generated_inclusion_criteria, generated_exclusion_criteria, drug_ranges, time_line,
+            eligibility_agent, user_inputs.get("inclusionCriteria", "No inclusion criteria provided"),
+            user_inputs.get("exclusionCriteria", "No exclusion criteria provided")
+        )
 
-        # Assign unique IDs
-        for item in generated_inclusion_criteria:
-            item["criteriaID"] = f"cid_{generate_object_id()}"
-        for item in generated_exclusion_criteria:
-            item["criteriaID"] = f"cid_{generate_object_id()}"
+        db_response = record_eligibility_criteria_job(ecid, categorized_data["categorized_generated_data"], categorized_data["categorized_user_data"], categorized_data["metrics_data"])
+        store_notification_data(ecid=ecid)
+        update_workflow_status(ecid=ecid, step="similar-criteria")
 
-
-        categorizedGeneratedData = categorize_generated_criteria(generated_inclusion_criteria=generated_inclusion_criteria,
-                                                                 generated_exclusion_criteria=generated_exclusion_criteria)
-        print("Categorized Generated Criteria")
-        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria)
-        if categorizedUserDataResponse["success"] is False:
-            print(categorizedUserDataResponse["message"])
-            categorizedUserData = {}
-        else:
-            categorizedUserData = categorizedUserDataResponse["data"]
-
-        # Merge Duplicates Values
-        drug_ranges = normalize_bmi_ranges(drug_ranges)
-        drug_ranges = merge_duplicate_values(drug_ranges)
-        time_line = merge_duplicate_values(time_line)
-
-        # Initialize the default dictionary
-        metrics_data = defaultdict(lambda: {"hba1c": [], "bmi": [], "timeline": []})
-
-        for item in drug_ranges:
-            value = item["value"].lower()
-            if "hba1c" in value:
-                metrics_data["key"]["hba1c"].append(item)  # Use a common key like "key"
-            else:
-                metrics_data["key"]["bmi"].append(item)
-
-        for item in time_line:
-            metrics_data["key"]["timeline"].append(item)
-
-        # Store job in DB
-        db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData, metrics_data["key"])
-        notification_response = store_notification_data(ecid=ecid)
-        workflow_status_response = update_workflow_status(ecid=ecid, step="similar-criteria")
-
-        print(workflow_status_response["message"])
-        print(notification_response["message"])
-        final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
-
-            # Prepare final response
-        model_generated_eligibility_criteria = {
-            "inclusionCriteria": [ item["criteria"] for item in generated_inclusion_criteria],
-            "exclusionCriteria": [ item["criteria"] for item in generated_exclusion_criteria],
-            "categorizedData": categorizedGeneratedData,
-            "userCategorizedData": categorizedUserData,
-            "metrics": metrics_data["key"]
+        final_response["data"] = {
+            "inclusionCriteria": [item["criteria"] for item in generated_inclusion_criteria],
+            "exclusionCriteria": [item["criteria"] for item in generated_exclusion_criteria],
+            "categorizedData": categorized_data["categorized_generated_data"],
+            "userCategorizedData": categorized_data["categorized_user_data"],
+            "metrics": categorized_data["metrics_data"]
         }
-
-        final_response["data"] = model_generated_eligibility_criteria
         final_response["success"] = True
-        return final_response
+        final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
 
     except Exception as e:
         final_response['message'] = f"Failed to generate trial eligibility criteria. Error: {e}"
-        return final_response
+
+    return final_response

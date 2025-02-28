@@ -52,10 +52,10 @@ def store_notification_data(ecid: str) -> Dict[str, Any]:
             notificationMessage=notification_message,
             createdAt=datetime.now(),  # Timestamp for record creation
             updatedAt=datetime.now()    # Timestamp for record update
-        ).dict()
+        )
 
         # Insert the document into the MongoDB collection using DAO
-        db_response = mongo_dao.insert("notifications", document)
+        db_response = mongo_dao.insert("notifications", document.model_dump())
 
         # Check if the document was successfully inserted
         if db_response and db_response.inserted_id:

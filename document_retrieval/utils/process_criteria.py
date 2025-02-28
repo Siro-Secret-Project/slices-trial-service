@@ -1,4 +1,4 @@
-from providers.openai.generate_embeddings import validate_document_similarity
+#from providers.openai.generate_embeddings import validate_document_similarity
 from providers.pinecone.similarity_search_service import query_pinecone_db_extended
 
 def process_criteria(criteria: str, document_search_data: dict, module: str = None) -> list:
