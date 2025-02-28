@@ -3,10 +3,30 @@ from pydantic import BaseModel
 
 class StoreEligibilityCriteria(BaseModel):
     ecid: str
-    inclusion_criteria: list
-    exclusion_criteria: list
-    created_at: datetime
-    updated_at: datetime
     categorizedData: dict
     userCategorizedData: dict
-    trailDocuments: list
+    createdAt: datetime
+    updatedAt: datetime
+
+class StoreSimilarTrials(BaseModel):
+    ecid: str
+    userName: str
+    userInput: dict
+    similarTrials: list
+    createdAt: datetime
+    updatedAt: datetime
+
+class NotificationData(BaseModel):
+    ecid: str
+    userName: str
+    notificationMessage: str
+    seen: bool = False
+    createdAt: datetime
+    updatedAt: datetime
+
+class WorkflowStates(BaseModel):
+    ecid: str
+    step: str
+    status: str
+    createdAt: datetime
+    updatedAt: datetime

@@ -6,24 +6,17 @@ from document_retrieval.models.db_models import StoreEligibilityCriteria
 mongo_dao = MongoDBDAO()
 
 def record_eligibility_criteria_job(job_id: str,
-                                    trial_inclusion_criteria: list,
-                                    trial_exclusion_criteria: list,
                                     categorized_data: dict,
-                                    categorized_data_user: dict,
-                                    trial_documents: list) -> dict:
+                                    categorized_data_user: dict) -> dict:
     """
     Stores the generated eligibility criteria (inclusion and exclusion) as a job in MongoDB.
 
-    This function creates a document using the provided job ID, inclusion criteria, and exclusion criteria,
-    and inserts it into the MongoDB collection for storing similar trials criteria results.
+    If the document already exists, retains the original created_at date.
 
     Args:
         job_id (str): The unique identifier for the job (ECID).
-        trial_inclusion_criteria (list): A list of inclusion criteria for the trial.
-        trial_exclusion_criteria (list): A list of exclusion criteria for the trial.
         categorized_data (dict): Categorized eligibility criteria in 14 categories.
-        categorized_data_user (dict): Categorized user provided eligibility criteria in 14 categories.
-        trial_documents (list): Similar trial documents associated with this job.
+        categorized_data_user (dict): Categorized user-provided eligibility criteria in 14 categories.
 
     Returns:
         dict: A response dictionary containing:
@@ -38,26 +31,32 @@ def record_eligibility_criteria_job(job_id: str,
     }
 
     try:
+        # Check if the document already exists
+        existing_doc = mongo_dao.find_one("similar_trials_criteria_results", {"ecid": job_id})
+
+        created_at = existing_doc["createdAt"] if existing_doc else datetime.now()
+
         # Create a document using the StoreEligibilityCriteria model
         document = StoreEligibilityCriteria(
             ecid=job_id,
-            inclusion_criteria=trial_inclusion_criteria,
-            exclusion_criteria=trial_exclusion_criteria,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
-            trailDocuments=trial_documents,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
+            createdAt=created_at,
+            updatedAt=datetime.now(),
         ).dict()
 
-        # Insert the document using MongoDBDAO
-        db_response = mongo_dao.insert("similar_trials_criteria_results", document)
+        # Insert or update the document using MongoDBDAO
+        db_response = mongo_dao.update(
+            collection_name="similar_trials_criteria_results",
+            update_values=document,
+            query={"ecid": job_id},
+            upsert=True
+        )
 
-        # Check if the document was successfully inserted
+        # Check if the document was successfully inserted or updated
         if db_response:
             final_response["success"] = True
             final_response["message"] = f"Successfully stored similar trials criteria results: {db_response}"
-            final_response["data"] = db_response
 
     except Exception as e:
         final_response["message"] = f"Error storing similar trials criteria results: {e}"

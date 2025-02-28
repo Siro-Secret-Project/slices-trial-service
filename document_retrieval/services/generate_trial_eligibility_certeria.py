@@ -1,162 +1,167 @@
-from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
+import concurrent.futures
+from collections import defaultdict
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
 from providers.openai.generate_embeddings import azure_client
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
+from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
+from document_retrieval.utils.categorize_eligibility_criteria import categorize_eligibility_criteria
+from utils.generate_object_id import generate_object_id
+from database.document_retrieval.store_notification_data import store_notification_data
+from database.document_retrieval.update_workflow_status import update_workflow_status
+from document_retrieval.utils.categorize_generated_criteria import categorize_generated_criteria
+from document_retrieval.utils.merge_duplicate_values import merge_duplicate_values, normalize_bmi_ranges
 
 
-async def generate_trial_eligibility_criteria(documents_search_keys: dict, ecid: str) -> dict:
+async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: list) -> dict:
     """
-    Generates trial eligibility criteria based on similar trial documents and a provided rationale.
-
-    This function fetches similar trial documents using the provided search keys, processes them,
-    and uses an eligibility agent to draft inclusion and exclusion criteria for a new trial.
-
-    Args:
-        documents_search_keys (dict): A dictionary containing search keys, including a rationale
-                                     for the trial and other parameters required to fetch similar
-                                     trial documents.
-        ecid (str): The Job ID for the Eligibility Agent.
-
-    Returns:
-        dict: A response dictionary containing:
-              - success (bool): Indicates whether the operation was successful.
-              - message (str): A message describing the outcome of the operation.
-              - data (dict or None): Contains the generated eligibility criteria if successful,
-                                     otherwise None.
+    Generate trial eligibility criteria in batches of 2 documents.
     """
-    # Initialize the final response structure
     final_response = {
         "success": False,
-        "message": "Failed to generate trial eligibility criteria.",
+        "message": "",
         "data": None
     }
 
     try:
-        # Fetch similar trial documents using the provided search keys
-        trial_documents_response = await fetch_similar_documents_extended(documents_search_keys=documents_search_keys)
-        inclusion_criteria = documents_search_keys["inclusionCriteria"]
-        inclusion_criteria = inclusion_criteria if inclusion_criteria is not None else "No inclusion criteria provided"
-        exclusion_criteria = documents_search_keys["exclusionCriteria"]
-        exclusion_criteria = exclusion_criteria if exclusion_criteria is not None else "No exclusion criteria provided"
-        trial_objectives = documents_search_keys["objective"]
-        trial_objectives = trial_objectives if trial_objectives is not None else "No trial objectives provided"
-        trialOutcomes = documents_search_keys["trialOutcomes"]
-        trialOutcomes = trialOutcomes if trialOutcomes is not None else "No trial outcomes provided"
-
-
-        # Check if fetching similar documents was unsuccessful
-        if trial_documents_response["success"] is False:
-            final_response["message"] = trial_documents_response["message"]
+        # Fetch User Inputs from DB
+        similar_trials_input_response = fetch_similar_trials_inputs_with_ecid(ecid=ecid)
+        if similar_trials_input_response["success"] is False:
+            final_response["message"] = similar_trials_input_response["message"]
             return final_response
 
-        # Extract the list of similar trial documents
-        trial_documents = trial_documents_response["data"]
+        user_inputs = similar_trials_input_response["data"]["userInput"]
+        inclusion_criteria = user_inputs.get("inclusionCriteria", "No inclusion criteria provided")
+        exclusion_criteria = user_inputs.get("exclusionCriteria", "No exclusion criteria provided")
 
-        # Initialize the TrialEligibilityAgent with required parameters
-        eligibility_agent = TrialEligibilityAgent(
-            azure_client,
-            max_tokens=3000
-        )
+        trial_documents = similar_trials_input_response["data"]["similarTrials"]
 
-        # Process and prepare similar trial documents for eligibility criteria generation
+        # Process and prepare similar trial documents
         similar_documents = []
         for item in trial_documents:
-            # Fetch the processed trial document using the NCT ID
-            doc = fetch_processed_trial_document_with_nct_id(nct_id=item["nctId"])["data"]
-            similarity_score = item["similarity_score"]
-            similar_documents.append({
-                "nctId": item["nctId"],
-                "similarity_score": similarity_score,
-                "document": doc
-            })
+            nct_id = item["nctId"]
+            if nct_id in trail_documents_ids:
+                similarity_score = item["similarity_score"]
+                doc = fetch_processed_trial_document_with_nct_id(nct_id=nct_id)["data"]
+                similar_documents.append({
+                    "nctId": nct_id,
+                    "similarity_score": similarity_score,
+                    "document": {
+                        "title": doc["officialTitle"],
+                        "inclusionCriteria": doc["inclusionCriteria"],
+                        "exclusionCriteria": doc["exclusionCriteria"],
+                        "primaryOutcomes": doc["primaryOutcomes"]
+                    }
+                })
 
-        # Generate eligibility criteria using the eligibility agent
-        eligibility_criteria_response = eligibility_agent.draft_eligibility_criteria(
-            sample_trial_rationale=documents_search_keys["rationale"],
-            similar_trial_documents=similar_documents,
-            user_provided_inclusion_criteria=inclusion_criteria,
-            user_provided_exclusion_criteria=exclusion_criteria,
-            user_provided_trial_outcome=trialOutcomes,
-            user_provided_trial_objective=trial_objectives
-        )
-        if eligibility_criteria_response["success"] is False:
-            final_response["message"] = eligibility_criteria_response["message"]
-            return final_response
+        # Sort documents by similarity score
+        similar_documents.sort(key=lambda x: x["similarity_score"], reverse=True)
 
-        eligibility_criteria = eligibility_criteria_response["data"]
+        # Initialize the TrialEligibilityAgent
+        eligibility_agent = TrialEligibilityAgent(azure_client, max_tokens=4000)
 
-        # Format the generated eligibility criteria
+        print("Started generating criteria")
+        # Initialize lists to store generated criteria
+        generated_inclusion_criteria = []
+        generated_exclusion_criteria = []
+        drug_ranges = []
+        time_line = []
+
+        # Function to process a batch
+        def process_batch(batch):
+            response = eligibility_agent.draft_eligibility_criteria(
+                sample_trial_rationale=user_inputs.get("rationale", "No rationale provided"),
+                similar_trial_documents=batch,
+                user_provided_inclusion_criteria=inclusion_criteria,
+                user_provided_exclusion_criteria=exclusion_criteria,
+                user_provided_trial_outcome=user_inputs.get("trialOutcomes", "No trial outcomes provided"),
+                user_provided_trial_conditions=user_inputs.get("condition", "No trial conditions provided"),
+                generated_inclusion_criteria=generated_inclusion_criteria,
+                generated_exclusion_criteria=generated_exclusion_criteria
+            )
+            if not response["success"]:
+                return {"error": response["message"]}
+
+            return response["data"]
+
+        # Process documents in batches of 1
+        batches = [similar_documents[i] for i in range(0, len(similar_documents))]
+
+        # Run batches in parallel (10 at a time)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            future_to_batch = {executor.submit(process_batch, batch): batch for batch in batches}
+
+            for future in concurrent.futures.as_completed(future_to_batch):
+                result = future.result()
+                if "error" in result:
+                    final_response["message"] = result["error"]
+                    break
+                generated_inclusion_criteria.extend(result["inclusionCriteria"])
+                generated_exclusion_criteria.extend(result["exclusionCriteria"])
+                drug_ranges.extend(result["drugRanges"])
+                time_line.extend(result["timeFrame"])
+                print("Completed One batch")
+
+
+        print("Finished generating criteria")
+
+        # Assign unique IDs
+        for item in generated_inclusion_criteria:
+            item["criteriaID"] = f"cid_{generate_object_id()}"
+        for item in generated_exclusion_criteria:
+            item["criteriaID"] = f"cid_{generate_object_id()}"
+
+
+        categorizedGeneratedData = categorize_generated_criteria(generated_inclusion_criteria=generated_inclusion_criteria,
+                                                                 generated_exclusion_criteria=generated_exclusion_criteria)
+        print("Categorized Generated Criteria")
+        categorizedUserDataResponse = categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria)
+        if categorizedUserDataResponse["success"] is False:
+            print(categorizedUserDataResponse["message"])
+            categorizedUserData = {}
+        else:
+            categorizedUserData = categorizedUserDataResponse["data"]
+
+        # Store job in DB
+        db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
+        notification_response = store_notification_data(ecid=ecid)
+        workflow_status_response = update_workflow_status(ecid=ecid, step="similar-criteria")
+
+        print(workflow_status_response["message"])
+        print(notification_response["message"])
+        final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
+
+        # Merge Duplicates Values
+        drug_ranges = normalize_bmi_ranges(drug_ranges)
+        drug_ranges = merge_duplicate_values(drug_ranges)
+        time_line = merge_duplicate_values(time_line)
+
+        # Initialize the default dictionary
+        metrics_data = defaultdict(lambda: {"hba1c": [], "bmi": [], "timeline": []})
+
+        for item in drug_ranges:
+            value = item["value"].lower()
+            if "hba1c" in value:
+                metrics_data["key"]["hba1c"].append(item)  # Use a common key like "key"
+            else:
+                metrics_data["key"]["bmi"].append(item)
+
+        for item in time_line:
+            metrics_data["key"]["timeline"].append(item)
+
+            # Prepare final response
         model_generated_eligibility_criteria = {
-            "inclusionCriteria": [item["criteria"] for item in eligibility_criteria["inclusionCriteria"]],
-            "exclusionCriteria": [item["criteria"] for item in eligibility_criteria["exclusionCriteria"]],
+            "inclusionCriteria": [ item["criteria"] for item in generated_inclusion_criteria],
+            "exclusionCriteria": [ item["criteria"] for item in generated_exclusion_criteria],
+            "categorizedData": categorizedGeneratedData,
+            "userCategorizedData": categorizedUserData,
+            "metrics": metrics_data["key"]
         }
 
-        # Categorise response
-        categorized_agent_response = eligibility_agent.categorise_eligibility_criteria(eligibility_criteria=eligibility_criteria)
-        if categorized_agent_response["success"] is False:
-            final_response["message"] = categorized_agent_response["message"]
-            return final_response
-
-
-        # Categorize the data
-        categorizedData = {}
-        for item in categorized_agent_response["data"]["inclusionCriteria"]:
-            item_class = item["class"]
-            categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
-            criteria = item["criteria"]
-            categorizedData[item_class]["Inclusion"].append(criteria)
-
-        for item in categorized_agent_response["data"]["exclusionCriteria"]:
-            item_class = item["class"]
-            test = categorizedData.get(item_class, None)
-            if test is None:
-                categorizedData[item_class] = {"Inclusion": [], "Exclusion": []}
-            criteria = item["criteria"]
-            categorizedData[item_class]["Exclusion"].append(criteria)
-
-        # Categorize user data
-        categorized_user_data = eligibility_agent.categorise_eligibility_criteria(eligibility_criteria=f"Inclusion: {inclusion_criteria}, Exclusion: {exclusion_criteria}")
-        # Categorize the data
-        categorized_data_user = {}
-        for item in categorized_user_data["data"]["inclusionCriteria"]:
-            item_class = item["class"]
-            categorized_data_user[item_class] = {"Inclusion": [], "Exclusion": []}
-            criteria = item["criteria"]
-            categorized_data_user[item_class]["Inclusion"].append(criteria)
-
-        for item in categorized_user_data["data"]["exclusionCriteria"]:
-            item_class = item["class"]
-            test = categorized_data_user.get(item_class, None)
-            if test is None:
-                categorized_data_user[item_class] = {"Inclusion": [], "Exclusion": []}
-            criteria = item["criteria"]
-            categorized_data_user[item_class]["Exclusion"].append(criteria)
-
-        # Store Job in DB
-        db_response = record_eligibility_criteria_job(job_id=ecid,
-                                                      trial_inclusion_criteria=model_generated_eligibility_criteria["inclusionCriteria"],
-                                                      trial_exclusion_criteria=model_generated_eligibility_criteria["exclusionCriteria"],
-                                                      categorized_data=categorizedData,
-                                                      categorized_data_user=categorized_user_data["data"],
-                                                      trial_documents=trial_documents)
-        if db_response["success"] is True:
-            final_response["message"] = db_response["message"]
-        else:
-            final_response["message"] = "Successfully generated trial eligibility criteria." + db_response["message"]
-
-
-        # Add Categorized Data in final response
-        model_generated_eligibility_criteria["categorizedData"] = categorizedData
-        model_generated_eligibility_criteria["userCategorizedData"] = categorized_data_user
-        model_generated_eligibility_criteria["trialDocuments"] = trial_documents
-
-        # Update the final response with the generated criteria
         final_response["data"] = model_generated_eligibility_criteria
         final_response["success"] = True
         return final_response
 
     except Exception as e:
-        # Handle any exceptions and update the response message with the error details
-        final_response['message'] = f"Failed to generate trial eligibility criteria.\n{e}"
+        final_response['message'] = f"Failed to generate trial eligibility criteria. Error: {e}"
         return final_response

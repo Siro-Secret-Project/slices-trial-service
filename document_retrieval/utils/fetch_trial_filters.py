@@ -1,6 +1,5 @@
 from database.document_retrieval.fetch_preprocessed_trial_document_with_nct_id import fetch_preprocessed_trial_document_with_nct_id
 
-
 def fetch_trial_filters(trial_documents: list) -> dict:
     final_response = {
         "success": False,
@@ -10,11 +9,12 @@ def fetch_trial_filters(trial_documents: list) -> dict:
     try:
         for item in trial_documents:
             nct_id = item["nctId"]
-            item["country"] = "Unknown"
-            item["phase"] = "Unknown"
-            item["enrollment_count"] = "Unknown"
-            item["start_date"] = "Unknown"
-            item["end_date"] = "Unknown"
+            item["locations"] = []
+            item["phases"] = []
+            item["enrollmentCount"] = "Unknown"
+            item["startDate"] = "Unknown"
+            item["endDate"] = "Unknown"
+            item["sponsorType"] = "Unknown"
             preprocessed_trial_document_response = fetch_preprocessed_trial_document_with_nct_id(nct_id=nct_id)
             if preprocessed_trial_document_response["success"] is False:
                 continue
@@ -24,25 +24,31 @@ def fetch_trial_filters(trial_documents: list) -> dict:
 
                 # fetch country for each document
                 trial_locations = preprocessed_trial_document["protocolSection"].get("contactsLocationsModule", {}).get("locations", [])
-                trial_country = trial_locations[0]["country"]
-                item['country'] = trial_country
+                countries = set()
+                for location in trial_locations:
+                    countries.add(location["country"])
+                item["locations"] = list(countries)
 
                 # fetch phase for document
                 phases_info = preprocessed_trial_document["protocolSection"].get("designModule",{}).get("phases", ["Unknown"])
-                trial_phases = phases_info[0]
-                item['phase'] = trial_phases
+                trial_phases = phases_info
+                item['phases'] = trial_phases
 
                 # fetch trail participant count protocolSection.designModule.enrollmentInfo.count
                 enrollment_info = preprocessed_trial_document["protocolSection"].get("designModule",{}).get("enrollmentInfo",{})
                 enrollment = enrollment_info.get("count", 0)
-                item['enrollment_count'] = enrollment
+                item['enrollmentCount'] = enrollment
 
                 # fetch trial start date and end date
                 date_info = preprocessed_trial_document["protocolSection"].get("statusModule",{})
                 start_date = date_info.get("startDateStruct", {}).get("date", None)
                 end_date = date_info.get("completionDateStruct", {}).get("date", None)
-                item['start_date'] = start_date
-                item['end_date'] = end_date
+                item['startDate'] = start_date
+                item['endDate'] = end_date
+
+                # Fetch Sponsor Type
+                sponsorType = preprocessed_trial_document["protocolSection"].get("sponsorCollaboratorsModule",{}).get("leadSponsor", {}).get("class", "Unknown")
+                item['sponsorType'] = sponsorType
 
         final_response["success"] = True
         final_response["data"] = trial_documents

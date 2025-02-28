@@ -32,7 +32,7 @@ def query_pinecone_db_extended(query: str, module: str = None) -> dict:
 
         # Query Pinecone and fetch similar documents
         filters = {"module": {"$eq": module}} if module else None
-        result = pinecone_store.query(vector=embedding, filters=filters, k=5)
+        result = pinecone_store.query(vector=embedding, filters=filters, k=20)
 
         # Process the Response Results
         data = result
@@ -62,16 +62,17 @@ def query_pinecone_db_extended(query: str, module: str = None) -> dict:
             nctId = key
             module = value['module_max_score']
             similarity_score = int(value['max_score'] * 100)
-            if similarity_score < 50:
+            if similarity_score < 40:
                 continue
-            document_response = fetch_processed_trial_document_with_nct_id(nctId, module)
-            if document_response['success'] is True:
-                final_data.append({
-                    "nctId": nctId,
-                    "module": module,
-                    "similarity_score": similarity_score,
-                    "document": document_response['data']
-                })
+            else:
+                document_response = fetch_processed_trial_document_with_nct_id(nctId)
+                if document_response['success'] is True:
+                    final_data.append({
+                        "nctId": nctId,
+                        "module": module,
+                        "similarity_score": similarity_score,
+                        "document": document_response['data']
+                    })
 
         # Return the final response
         final_response['data'] = final_data
