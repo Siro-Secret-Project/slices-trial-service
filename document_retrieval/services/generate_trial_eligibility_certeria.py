@@ -122,15 +122,6 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
         else:
             categorizedUserData = categorizedUserDataResponse["data"]
 
-        # Store job in DB
-        db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData)
-        notification_response = store_notification_data(ecid=ecid)
-        workflow_status_response = update_workflow_status(ecid=ecid, step="similar-criteria")
-
-        print(workflow_status_response["message"])
-        print(notification_response["message"])
-        final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
-
         # Merge Duplicates Values
         drug_ranges = normalize_bmi_ranges(drug_ranges)
         drug_ranges = merge_duplicate_values(drug_ranges)
@@ -148,6 +139,15 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: li
 
         for item in time_line:
             metrics_data["key"]["timeline"].append(item)
+
+        # Store job in DB
+        db_response = record_eligibility_criteria_job(ecid, categorizedGeneratedData, categorizedUserData, metrics_data["key"])
+        notification_response = store_notification_data(ecid=ecid)
+        workflow_status_response = update_workflow_status(ecid=ecid, step="similar-criteria")
+
+        print(workflow_status_response["message"])
+        print(notification_response["message"])
+        final_response["message"] = db_response.get("message", "Successfully generated trial eligibility criteria.")
 
             # Prepare final response
         model_generated_eligibility_criteria = {

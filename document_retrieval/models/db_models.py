@@ -5,6 +5,7 @@ class StoreEligibilityCriteria(BaseModel):
     ecid: str
     categorizedData: dict
     userCategorizedData: dict
+    metrics: dict
     createdAt: datetime
     updatedAt: datetime
 

@@ -7,7 +7,8 @@ mongo_dao = MongoDBDAO()
 
 def record_eligibility_criteria_job(job_id: str,
                                     categorized_data: dict,
-                                    categorized_data_user: dict) -> dict:
+                                    categorized_data_user: dict,
+                                    metrics_data: dict) -> dict:
     """
     Stores the generated eligibility criteria (inclusion and exclusion) as a job in MongoDB.
 
@@ -17,6 +18,7 @@ def record_eligibility_criteria_job(job_id: str,
         job_id (str): The unique identifier for the job (ECID).
         categorized_data (dict): Categorized eligibility criteria in 14 categories.
         categorized_data_user (dict): Categorized user-provided eligibility criteria in 14 categories.
+        metrics_data (dict): Metrics data for this job.
 
     Returns:
         dict: A response dictionary containing:
@@ -41,6 +43,7 @@ def record_eligibility_criteria_job(job_id: str,
             ecid=job_id,
             categorizedData=categorized_data,
             userCategorizedData=categorized_data_user,
+            metrics=metrics_data,
             createdAt=created_at,
             updatedAt=datetime.now(),
         ).dict()
