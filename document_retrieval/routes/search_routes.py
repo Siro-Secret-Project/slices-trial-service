@@ -84,7 +84,7 @@ async def search_routes_new(request: DocumentFilters, response: Response):
 
         # Fetch similar documents based on the input criteria
         similar_documents_response = await fetch_similar_documents_extended(documents_search_keys=input_document,
-                                                                            custom_weights=weights.dict(),
+                                                                            custom_weights=weights.model_dump(),
                                                                             document_filters=document_filters,
                                                                             user_data=user_data)
 

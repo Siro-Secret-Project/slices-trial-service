@@ -1,6 +1,6 @@
 from providers.pinecone.pinecone_connection import PineconeVectorStore
 from collections import defaultdict
-from providers.openai.generate_embeddings import generate_embeddings_from_azure_client
+from providers.openai.openai_connection import OpenAIClient
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import \
     fetch_processed_trial_document_with_nct_id
 
@@ -24,7 +24,8 @@ def query_pinecone_db_extended(query: str, module: str = None) -> dict:
 
     try:
         # Generate embedding for the query
-        embedding_response = generate_embeddings_from_azure_client(query)
+        openai_client = OpenAIClient()
+        embedding_response = openai_client.generate_embeddings(query)
         embedding = embedding_response["data"].flatten().tolist()
 
         # Initialize Pinecone vector store
