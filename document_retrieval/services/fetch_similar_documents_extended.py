@@ -39,7 +39,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             item["module"] = "trialRationale"
 
         trial_conditions_documents = process_criteria(
-            documents_search_keys.get("conditions"),
+            documents_search_keys.get("condition"),
             module="conditionsModule",
             document_search_data=documents_search_keys
         )
@@ -70,13 +70,16 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
             if nctId not in unique_documents or doc["similarity_score"] > unique_documents[nctId]["similarity_score"]:
                 unique_documents[nctId] = doc
 
+        print(len(unique_documents))
         # filter documents
         fetch_add_documents_filter_response = fetch_trial_filters(trial_documents=list(unique_documents.values()))
         if fetch_add_documents_filter_response["success"] is True:
-            trial_documents = fetch_add_documents_filter_response["data"]
+            trial_documents_with_filters = fetch_add_documents_filter_response["data"]
+            print(f"Documents length: {len(trial_documents_with_filters)}")
+            trial_documents = process_filters(documents=trial_documents_with_filters, filters=document_filters)
             print(f"Documents length: {len(trial_documents)}")
-            trial_documents = process_filters(documents=trial_documents, filters=document_filters)
-            print(f"Documents length: {len(trial_documents)}")
+            elements_to_append = [item for item in trial_documents_with_filters if item not in trial_documents]
+            trial_documents.extend(elements_to_append)
             if len(trial_documents) == 0:
                 db_response = store_similar_trials(user_name=user_data["userName"],
                                                    ecid=user_data["ecid"],

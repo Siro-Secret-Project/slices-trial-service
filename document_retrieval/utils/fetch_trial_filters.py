@@ -1,6 +1,5 @@
 from database.document_retrieval.fetch_preprocessed_trial_document_with_nct_id import fetch_preprocessed_trial_document_with_nct_id
 
-
 def fetch_trial_filters(trial_documents: list) -> dict:
     final_response = {
         "success": False,
