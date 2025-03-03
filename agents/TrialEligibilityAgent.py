@@ -2,6 +2,8 @@ import re
 import json
 from document_retrieval.utils import prompts
 from typing import Dict, List
+from database.mongo_db_connection import MongoDBDAO
+from document_retrieval.utils.generate_metrics_prompt import generate_metrics_prompt
 
 
 class TrialEligibilityAgent:
@@ -216,7 +218,7 @@ class TrialEligibilityAgent:
             str: The constructed user input message.
         """
         print("Constructing user input")
-        print(self.pattern)
+        print(self.response_format)
         return f"""
             Medical Trial Rationale: {sample_trial_rationale}
             Similar/Existing Medical Trial Document: {similar_trial_documents}
@@ -267,8 +269,21 @@ class TrialEligibilityAgent:
         Returns:
             List: A list of extracted drug metrics.
         """
+
+        # Initialize MongoDBDAO
+        mongo_dao = MongoDBDAO()
+
+        # Query DB to fetch Prompt
+        response = mongo_dao.find_one(collection_name="LOVs", query={"name": "metrics_prompt_data"})
+        if response is None:
+            return []
+        else:
+            values = response["values"]
+        # Generate prompt
+        system_prompt = generate_metrics_prompt(values=values)
+
         message_list = [
-            {"role": "system", "content": prompts.values_count_prompt},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"{similar_trial_documents}"}
         ]
 
@@ -354,5 +369,3 @@ class TrialEligibilityAgent:
         extracted_data = [match.strip() for match in matches]
 
         return extracted_data
-
-

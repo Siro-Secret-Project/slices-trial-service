@@ -1,5 +1,5 @@
 import concurrent.futures
-from collections import defaultdict
+from database.mongo_db_connection import MongoDBDAO
 from typing import Dict, List, Any
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
 from providers.openai.openai_connection import OpenAIClient
@@ -84,20 +84,39 @@ def categorize_and_merge_data(generated_inclusion_criteria: List[Dict[str, Any]]
     drug_ranges = merge_duplicate_values(drug_ranges)
     time_line = merge_duplicate_values(time_line)
 
-    metrics_data = defaultdict(lambda: {"hba1c": [], "bmi": [], "timeline": []})
+    metrics_data = {"timeline":[]}
+
+    # Initialize MongoDBDAO
+    mongo_dao = MongoDBDAO()
+
+    # Query DB to fetch Prompt
+    response = mongo_dao.find_one(collection_name="LOVs", query={"name": "metrics_prompt_data"})
+    if response is None:
+        return {}
+    else:
+        values = response["values"]
+
+    keys = [item["value"].lower() for item in values]
+
+    # Initialize metrics_data dynamically based on keys
+    metrics_data = {"timeline": []}
+    for key in keys:
+        metrics_data[key] = []
+
+    # Categorize drug ranges dynamically
     for item in drug_ranges:
         value = item["value"].lower()
-        if "hba1c" in value:
-            metrics_data["key"]["hba1c"].append(item)
-        else:
-            metrics_data["key"]["bmi"].append(item)
+        for key in keys:  # Check if any key is present in value
+            if key in value:
+                metrics_data[key].append(item)
+                break  # Avoid duplicate assignments
     for item in time_line:
-        metrics_data["key"]["timeline"].append(item)
+        metrics_data["timeline"].append(item)
 
     return {
         "categorized_generated_data": categorized_generated_data,
         "categorized_user_data": categorized_user_data,
-        "metrics_data": metrics_data["key"]
+        "metrics_data": metrics_data
     }
 
 
