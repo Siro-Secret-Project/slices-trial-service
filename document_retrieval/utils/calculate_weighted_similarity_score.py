@@ -52,10 +52,8 @@ def _calculate_weighted_similarity_score(
         dict: Dictionary with success status, message, and similarity scores.
     """
     try:
-        print("Embedding documents...")
         user_embeddings = _generate_document_embeddings(user_input_document)
         target_embeddings = _generate_document_embeddings(target_document)
-        print("Calculating weighted similarity score...")
 
         similarity_scores = {
             module: _calculate_cosine_similarity(user_embeddings[module], target_embeddings[module])
@@ -99,6 +97,8 @@ def process_similarity_scores(
     try:
         trial_target_documents = []
 
+        print(f"Calculating similarity scores for {len(target_documents_ids)} documents...")
+        counter = 0
         for nct_id in target_documents_ids:
             target_document_response = fetch_processed_trial_document_with_nct_id(nct_id=nct_id)
             if not target_document_response["success"]:
@@ -116,6 +116,8 @@ def process_similarity_scores(
             similarity_response = _calculate_weighted_similarity_score(
                 user_input_document, target_document, weights
             )
+            counter += 1
+            print(f"{counter}/{len(target_documents_ids)}: {nct_id}")
             if not similarity_response["success"]:
                 print(f"Failed to calculate weighted similarity score for {nct_id}")
                 continue

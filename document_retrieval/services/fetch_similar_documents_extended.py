@@ -30,6 +30,7 @@ async def fetch_similar_documents_extended(documents_search_keys: dict, custom_w
         user_inputs = documents_search_keys | document_filters
 
         # Process each criteria and store the results
+        print(f"Pinecone DB Started")
         criteria_documents = _process_all_criteria(documents_search_keys)
         print("Documents fetched")
 
