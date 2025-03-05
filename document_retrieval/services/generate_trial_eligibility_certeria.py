@@ -37,7 +37,9 @@ def prepare_similar_documents(trial_documents: List[Dict[str, Any]], trail_docum
                     "title": doc["officialTitle"],
                     "inclusionCriteria": doc["inclusionCriteria"],
                     "exclusionCriteria": doc["exclusionCriteria"],
-                    "primaryOutcomes": doc["primaryOutcomes"]
+                    "primaryOutcomes": doc["primaryOutcomes"],
+                    "secondaryOutcomes": doc["secondaryOutcomes"],
+                    "interventions": doc["interventions"]
                 }
             })
     similar_documents.sort(key=lambda x: x["similarity_score"], reverse=True)
