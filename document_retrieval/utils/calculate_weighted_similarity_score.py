@@ -2,10 +2,8 @@
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from database.document_retrieval.fetch_processed_trial_document_with_nct_id import (
-    fetch_processed_trial_document_with_nct_id,
-)
 from providers.openai.openai_connection import OpenAIClient
+from database.document_retrieval.fetch_embedded_document import fetch_embedded_document
 
 def _generate_document_embeddings(document: dict) -> dict:
     """Generates embeddings for each section of the provided document.
@@ -39,13 +37,13 @@ def _calculate_cosine_similarity(user_embedding: list, target_embedding: list) -
     )[0][0]
 
 def _calculate_weighted_similarity_score(
-    user_input_document: dict, target_document: dict, weights: dict
+    user_input_document: dict, weights: dict, nct_id: str
 ) -> dict:
     """Calculates the weighted similarity score between a user input document and a target document.
 
     Args:
         user_input_document (dict): User input document with different sections.
-        target_document (dict): Target document with different sections.
+        nct_id (str): Unique NCT ID of the trial document.
         weights (dict): Dictionary containing similarity weights for each section.
 
     Returns:
@@ -53,11 +51,19 @@ def _calculate_weighted_similarity_score(
     """
     try:
         user_embeddings = _generate_document_embeddings(user_input_document)
-        target_embeddings = _generate_document_embeddings(target_document)
-
+        target_embeddings_response = fetch_embedded_document(nct_id=nct_id)
+        if target_embeddings_response["success"] is False:
+            return {"success": False, "message": target_embeddings_response["message"]}
+        target_embeddings = {
+            "inclusionCriteria": target_embeddings_response["data"]["inclusionCriteria"],
+            "exclusionCriteria": target_embeddings_response["data"]["exclusionCriteria"],
+            "title": target_embeddings_response["data"]["officialTitle"],
+            "trialOutcomes": target_embeddings_response["data"]["primaryOutcomes"],
+            "condition": target_embeddings_response["data"]["conditions"],
+        }
         similarity_scores = {
             module: _calculate_cosine_similarity(user_embeddings[module], target_embeddings[module])
-            for module in target_embeddings.keys()
+            for module in user_embeddings.keys()
         }
 
         sum_weights = sum(weights[module] for module in similarity_scores.keys())
@@ -96,25 +102,21 @@ def process_similarity_scores(
     """
     try:
         trial_target_documents = []
+        # Prepare User Document
+        user_document = {
+            "inclusionCriteria": user_input_document["inclusionCriteria"],
+            "exclusionCriteria": user_input_document["exclusionCriteria"],
+            "title": user_input_document["title"],
+            "trialOutcomes": user_input_document["trialOutcomes"],
+            "condition": user_input_document["condition"],
+        }
 
         print(f"Calculating similarity scores for {len(target_documents_ids)} documents...")
         counter = 0
         for nct_id in target_documents_ids:
-            target_document_response = fetch_processed_trial_document_with_nct_id(nct_id=nct_id)
-            if not target_document_response["success"]:
-                print(f"Failed to retrieve target document: {nct_id}")
-                continue
-
-            target_document = {
-                "inclusionCriteria": target_document_response["data"].get("inclusionCriteria"),
-                "exclusionCriteria": target_document_response["data"].get("exclusionCriteria"),
-                "title": target_document_response["data"].get("officialTitle"),
-                "trialOutcomes": target_document_response["data"].get("primaryOutcomes"),
-                "condition": target_document_response["data"].get("conditions"),
-            }
 
             similarity_response = _calculate_weighted_similarity_score(
-                user_input_document, target_document, weights
+                user_document, weights, nct_id
             )
             counter += 1
             print(f"{counter}/{len(target_documents_ids)}: {nct_id}")
