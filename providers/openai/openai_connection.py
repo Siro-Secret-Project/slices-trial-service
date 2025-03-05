@@ -1,5 +1,4 @@
 import os
-import openai
 from openai import OpenAI
 from dotenv import load_dotenv
 import numpy as np
@@ -30,7 +29,6 @@ class OpenAIClient:
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY is not set in environment variables.")
 
-        openai.api_key = self.api_key
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.client = OpenAI()

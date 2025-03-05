@@ -33,10 +33,10 @@ def store_similar_trials(user_name: str, ecid: str, user_input: dict, similar_tr
             similarTrials=similar_trials,
             createdAt=datetime.now(),  # Timestamp for record creation
             updatedAt=datetime.now()   # Timestamp for record update
-        ).dict()
+        )
 
         # Insert the document into the MongoDB collection using DAO
-        db_response = mongo_dao.insert("similar_trials_results", document)
+        db_response = mongo_dao.insert("similar_trials_results", document.model_dump())
 
         # Check if the document was successfully inserted
         if db_response:

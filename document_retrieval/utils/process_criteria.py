@@ -1,4 +1,4 @@
-from providers.openai.generate_embeddings import validate_document_similarity
+#from providers.openai.generate_embeddings import validate_document_similarity
 from providers.pinecone.similarity_search_service import query_pinecone_db_extended
 
 def process_criteria(criteria: str, document_search_data: dict, module: str = None) -> list:
@@ -8,9 +8,8 @@ def process_criteria(criteria: str, document_search_data: dict, module: str = No
     """
     if not criteria:
         return []
-    print(f"Pinecone DB Started")
+
     pinecone_response = query_pinecone_db_extended(query=criteria, module=module)
-    print(f"Pinecone DB Finished")
 
     # document_validation = validate_document_similarity(
     #     similar_documents=pinecone_response["data"],

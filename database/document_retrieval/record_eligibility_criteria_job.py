@@ -46,7 +46,7 @@ def record_eligibility_criteria_job(job_id: str,
             metrics=metrics_data,
             createdAt=created_at,
             updatedAt=datetime.now(),
-        ).dict()
+        ).model_dump()  # Use .model_dump() instead of .dict()
 
         # Insert or update the document using MongoDBDAO
         db_response = mongo_dao.update(
