@@ -147,7 +147,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: Li
 
         batches = [similar_documents[i] for i in range(0, len(similar_documents))]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
             future_to_batch = {executor.submit(process_batch, batch, eligibility_agent, user_inputs, generated_inclusion_criteria, generated_exclusion_criteria): batch for batch in batches}
 
             for future in concurrent.futures.as_completed(future_to_batch):
