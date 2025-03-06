@@ -2,7 +2,7 @@
 
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from providers.openai.openai_connection import OpenAIClient
+from providers.openai.azure_openai_connection import AzureOpenAIClient
 from database.document_retrieval.fetch_embedded_document import fetch_embedded_document
 
 def _generate_document_embeddings(document: dict) -> dict:
@@ -14,7 +14,7 @@ def _generate_document_embeddings(document: dict) -> dict:
     Returns:
         dict: Dictionary containing section-wise embeddings.
     """
-    openai_client = OpenAIClient()
+    openai_client = AzureOpenAIClient()
     return {
         section: openai_client.generate_embeddings(content)["data"].flatten().tolist()
         for section, content in document.items()

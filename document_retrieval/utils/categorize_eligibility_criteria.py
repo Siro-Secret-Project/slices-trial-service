@@ -1,4 +1,5 @@
 from utils.generate_object_id import generate_object_id
+from document_retrieval.utils.categorize_generated_criteria import _generate_tags
 
 def filter_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria):
     """Filter the inclusion and exclusion criteria using the eligibility agent."""
@@ -100,6 +101,10 @@ def categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclu
             return {"success": False, "message": categorized_response["message"], "data": None}
 
         categorized_data = build_categorized_data(categorized_response, user_provided_criteria)
+        for category, value in categorized_data.items():
+            for key, criteria in value.items():
+                for item in criteria:
+                    item["tags"] = _generate_tags(criteria_text=item["criteria"])
         return {"success": True, "message": "Successfully categorized eligibility criteria.", "data": categorized_data}
 
     except Exception as e:
