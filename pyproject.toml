@@ -20,6 +20,7 @@ transformers = "^4.48.0"
 scikit-learn = "^1.6.1"
 python-dotenv = "^1.0.1"
 pytz = "^2025.1"
+boto3 = "^1.37.7"
 
 
 [build-system]

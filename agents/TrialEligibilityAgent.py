@@ -4,6 +4,7 @@ from document_retrieval.utils import prompts
 from typing import Dict, List
 from database.mongo_db_connection import MongoDBDAO
 from document_retrieval.utils.generate_metrics_prompt import generate_metrics_prompt
+from providers.aws_bedrock.aws_bedrock_connection import BedrockLlamaClient
 
 
 class TrialEligibilityAgent:
@@ -16,8 +17,10 @@ class TrialEligibilityAgent:
             response_format: The format of the response from OpenAI.
         """
         self.openai_client = openai_client
+        self.bedrock_client = BedrockLlamaClient()
         self.categorisation_role = prompts.categorisation_role
         self.pattern = r'timeFrame\s*-\s*(.*?)(?=measure|$)'
+        self.json_pattern = r'\{[\s\S]*\}'
         self.medical_writer_agent_role = prompts.medical_writer_agent_role
         self.filter_role = prompts.filter_role
         self.response_format = response_format
@@ -243,21 +246,31 @@ class TrialEligibilityAgent:
                 - inclusion_criteria (List): Generated inclusion criteria.
                 - exclusion_criteria (List): Generated exclusion criteria.
         """
-        message_list = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_input}
-        ]
+
+        processed_input = f"""### Now, extract tags from the following input:{user_input}"""
+        model_input_prompt = system_prompt + processed_input
 
         # Send the request to the AI model
-        str_criteria_response = self.openai_client.generate_text(messages=message_list,
-                                                                 response_format=self.response_format)
-        json_criteria_response = json.loads(str_criteria_response["data"].choices[0].message.content)
+        response = self.bedrock_client.generate_text_llama(prompt=model_input_prompt,max_gen_len=2000)
+        if response["success"] is False:
+            print(response["message"])
+            return [], []
+        else:
+            # Regex pattern to extract JSON
+            match = re.search(self.json_pattern, response["data"])
 
-        # Extract inclusion and exclusion criteria from the response
-        inclusion_criteria = json_criteria_response.get("inclusionCriteria", [])
-        exclusion_criteria = json_criteria_response.get("exclusionCriteria", [])
+            if match:
+                json_str = match.group(0)
+                response_json = json.loads(json_str)
 
-        return inclusion_criteria, exclusion_criteria
+                # Extract inclusion and exclusion criteria from the response
+                inclusion_criteria = response_json.get("inclusionCriteria", [])
+                exclusion_criteria = response_json.get("exclusionCriteria", [])
+
+                return inclusion_criteria, exclusion_criteria
+            else:
+                return [], []
+
 
     def _extract_drug_metrics(self, similar_trial_documents: Dict) -> List:
         """
