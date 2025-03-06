@@ -358,3 +358,53 @@ filter_role = ("""
                 }
             """
                             )
+
+
+llama_prompt = """
+You are an expert in extracting structured medical information from unstructured text.
+Given a clinical trial eligibility criteria input, extract relevant tags related to:
+- HbA1c levels (with specified range if available)
+- BMI (Body Mass Index) range
+- Age range
+- eGFR (estimated Glomerular Filtration Rate) values
+- Pregnancy-related conditions
+
+### Instructions:
+1. Identify and extract all numerical ranges for HbA1c, BMI, Age, and eGFR.
+2. If multiple values exist for a category (e.g., two different HbA1c ranges), include both separately.
+3. Convert extracted values into a structured format.
+4. Format the output as a JSON object with a list of tags.
+
+### Input Example:
+Male or female, aged 18~75 years old;
+T2DM and treated with Metformin ≥ 1500mg/day constantly for at least 12 consecutive weeks;
+7.5% ≤ HbA1c ≤ 10.0% at screening;
+18.5 kg/m2 < BMI < 35.0 kg/m2 at screening;
+
+### Expected Output Format:
+{
+  "tags": ["Age 18-75", "HbA1c 7.5-10.0", "BMI <35.0"]
+}
+
+### Additional Example:
+Renal impairment measured as estimated glomerular filtration rate (eGFR) below 60 mL/min/1.73 m^2 as per Chronic Kidney Disease Epidemiology Collaboration formula(CKD-EPI).
+Female who is pregnant, breast-feeding or intends to become pregnant or is of child-bearing potential and not using a highly effective contraceptive method.
+
+### Expected Output:
+{
+  "tags": ["Pregnant", "eGFR < 60 mL/min/1.73 m²"]
+}
+
+### Response format:
+json_object:
+{
+  "tags": [
+    "tag1",
+    "tag2",
+    "tag3"
+  ]
+}
+
+Return the output strictly in JSON format as specified above.
+If input string does not have any tags present simply return an empty list.
+"""

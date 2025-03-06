@@ -2,7 +2,7 @@ import concurrent.futures
 from database.mongo_db_connection import MongoDBDAO
 from typing import Dict, List, Any
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
-from providers.openai.openai_connection import OpenAIClient
+from providers.openai.azure_openai_connection import AzureOpenAIClient
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
@@ -86,8 +86,6 @@ def categorize_and_merge_data(generated_inclusion_criteria: List[Dict[str, Any]]
     drug_ranges = merge_duplicate_values(drug_ranges)
     time_line = merge_duplicate_values(time_line)
 
-    metrics_data = {"timeline":[]}
-
     # Initialize MongoDBDAO
     mongo_dao = MongoDBDAO()
 
@@ -137,7 +135,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: Li
 
         similar_documents = prepare_similar_documents(trial_documents, trail_documents_ids)
 
-        openai_client = OpenAIClient()
+        openai_client = AzureOpenAIClient()
         eligibility_agent = TrialEligibilityAgent(openai_client, response_format={"type": "json_object"})
 
         generated_inclusion_criteria = []
@@ -147,7 +145,7 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: Li
 
         batches = [similar_documents[i] for i in range(0, len(similar_documents))]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             future_to_batch = {executor.submit(process_batch, batch, eligibility_agent, user_inputs, generated_inclusion_criteria, generated_exclusion_criteria): batch for batch in batches}
 
             for future in concurrent.futures.as_completed(future_to_batch):

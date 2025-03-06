@@ -1,8 +1,10 @@
 import json
+import re
 from utils.generate_object_id import generate_object_id
-from document_retrieval.utils.prompts import merge_prompt
-from providers.openai.openai_connection import OpenAIClient
+from document_retrieval.utils.prompts import merge_prompt, llama_prompt
+from providers.openai.azure_openai_connection import AzureOpenAIClient
 import concurrent.futures
+from providers.aws_bedrock.aws_bedrock_connection import BedrockLlamaClient
 
 
 criteria_categories = [
@@ -12,6 +14,37 @@ criteria_categories = [
     "Recent Participation in Other Clinical Trials", "Allergies and Drug Reactions",
     "Mental Health Disorders", "Infectious Diseases", "Other", "Age"
 ]
+
+
+def _generate_tags(criteria_text):
+    """
+    Generates tags for the given criteria text using Bedrock Llama model.
+
+    Args:
+        criteria_text (str): The criteria text to extract tags from.
+
+    Returns:
+        list: A list of extracted tags.
+    """
+    bedrock_llama_client = BedrockLlamaClient()
+    processed_input = f"""
+      ### Now, extract tags from the following input:
+      {criteria_text}
+    """
+    model_input_prompt = llama_prompt + processed_input
+    response = bedrock_llama_client.generate_text_llama(model_input_prompt)
+
+    if response["success"] is False:
+        return []
+
+    pattern = r'\{[\s\S]*\}'  # Regex pattern to extract JSON
+    match = re.search(pattern, response["data"])
+    if match:
+        json_str = match.group(0)
+        response_json = json.loads(json_str)
+        return response_json.get("tags", [])
+
+    return []
 
 
 def _process_criteria(criteria_list, category):
@@ -37,7 +70,7 @@ def _process_criteria(criteria_list, category):
             {"role": "user", "content": json.dumps(filtered_criteria)}
         ]
 
-        openai_client = OpenAIClient()
+        openai_client = AzureOpenAIClient()
         response = openai_client.generate_text(messages=messages, response_format={"type": "json_object"})
         try:
             merged_response = json.loads(response["data"].choices[0].message.content).get("response", [])
@@ -53,6 +86,9 @@ def _process_criteria(criteria_list, category):
                         res["source"].update(entry["source"])
             res["criteriaID"] = generate_object_id()
 
+            # Generate Tags
+            res["tags"] = _generate_tags(res["criteria"])
+
         return merged_response
     except Exception as e:
         print(f"Error processing criteria {category}: {e}")
@@ -67,7 +103,8 @@ def categorize_generated_criteria(generated_inclusion_criteria, generated_exclus
     categorized_data = {}
 
     # Use ThreadPoolExecutor for parallel processing
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(criteria_categories)) as executor:
+    # Change max_workers=len(criteria_categories)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # Submit tasks for inclusion criteria
         inclusion_futures = {
             executor.submit(
