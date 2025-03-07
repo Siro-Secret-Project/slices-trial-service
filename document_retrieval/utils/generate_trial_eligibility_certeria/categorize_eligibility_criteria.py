@@ -1,5 +1,5 @@
 from utils.generate_object_id import generate_object_id
-from document_retrieval.utils.categorize_generated_criteria import _generate_tags
+from document_retrieval.utils.generate_trial_eligibility_certeria.categorize_generated_criteria import _generate_tags
 
 def filter_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria):
     """Filter the inclusion and exclusion criteria using the eligibility agent."""

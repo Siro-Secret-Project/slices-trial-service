@@ -4,7 +4,7 @@ from utils.generate_object_id import generate_object_id
 from document_retrieval.utils.prompts import merge_prompt, llama_prompt
 from providers.openai.azure_openai_connection import AzureOpenAIClient
 import concurrent.futures
-from providers.aws_bedrock.aws_bedrock_connection import BedrockLlamaClient
+from providers.aws.aws_bedrock_connection import BedrockLlamaClient
 
 
 criteria_categories = [

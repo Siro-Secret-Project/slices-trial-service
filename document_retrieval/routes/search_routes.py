@@ -1,8 +1,14 @@
-from fastapi import APIRouter,Response, status
+from fastapi import APIRouter, Response, status, UploadFile, File
 from document_retrieval.models.routes_models import BaseResponse, GenerateEligibilityCriteria, DocumentFilters
 from document_retrieval.services.fetch_similar_documents_extended import fetch_similar_documents_extended
 from document_retrieval.services.generate_trial_eligibility_certeria import generate_trial_eligibility_criteria
+from document_retrieval.services.pdf_extraction_service import pdf_extraction_service
 from datetime import datetime
+import logging
+
+# Setup logger
+logger = logging.getLogger("document_retrieval")
+logger.setLevel(logging.DEBUG)
 
 router = APIRouter()
 
@@ -155,3 +161,33 @@ async def generate_trial_eligibility_criteria_route(request: GenerateEligibility
         base_response.message = f"Unexpected error: {e}"
         response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
         return base_response
+
+
+@router.post("/extract_pdf_protocol_keys", response_model=BaseResponse)
+async def extract_pdf_protocol_keys_route(response: Response, file: UploadFile = File(...)):
+    base_response = BaseResponse(
+        success=False,
+        status_code=status.HTTP_400_BAD_REQUEST,
+        data=None,
+        message="Bad Request"
+    )
+    try:
+        service_response = await pdf_extraction_service(file=file)
+        if service_response["success"] is False:
+            base_response.message = service_response["message"]
+            response.status_code = status.HTTP_400_BAD_REQUEST
+        else:
+            base_response.success = True
+            base_response.message = service_response["message"]
+            base_response.status_code = status.HTTP_200_OK
+            base_response.data = service_response["data"]
+            response.status_code = status.HTTP_200_OK
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        base_response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+        base_response.message = f"Unexpected error: {e}"
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    return base_response
+

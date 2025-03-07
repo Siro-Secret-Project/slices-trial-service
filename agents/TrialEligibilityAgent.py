@@ -3,8 +3,8 @@ import json
 from document_retrieval.utils import prompts
 from typing import Dict, List
 from database.mongo_db_connection import MongoDBDAO
-from document_retrieval.utils.generate_metrics_prompt import generate_metrics_prompt
-from providers.aws_bedrock.aws_bedrock_connection import BedrockLlamaClient
+from document_retrieval.utils.generate_trial_eligibility_certeria.generate_metrics_prompt import generate_metrics_prompt
+from providers.aws.aws_bedrock_connection import BedrockLlamaClient
 
 
 class TrialEligibilityAgent:
