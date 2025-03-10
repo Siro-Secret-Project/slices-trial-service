@@ -1,10 +1,14 @@
 import json
 import re
+import logging
 from utils.generate_object_id import generate_object_id
 from document_retrieval.utils.prompts import merge_prompt, llama_prompt
-from providers.openai.azure_openai_connection import AzureOpenAIClient
 import concurrent.futures
 from providers.aws.aws_bedrock_connection import BedrockLlamaClient
+
+# Setup Logger
+logger = logging.getLogger("document_retrieval")
+logger.setLevel(logging.DEBUG)
 
 
 criteria_categories = [
@@ -49,7 +53,7 @@ def _generate_tags(criteria_text):
 
 def _process_criteria(criteria_list, category):
     try:
-        print(f"Processing criteria for {category}")
+        logger.info(f"Processing criteria for {category}")
         filtered_criteria = [item for item in criteria_list if item["class"] == category]
 
         if not filtered_criteria:
@@ -63,19 +67,31 @@ def _process_criteria(criteria_list, category):
 
             return _process_criteria(first_half, category) + _process_criteria(second_half, category)
 
-        print(f"Found {len(filtered_criteria)} criteria for {category}.")
+        logger.debug(f"Found {len(filtered_criteria)} criteria for {category}.")
 
-        messages = [
-            {"role": "system", "content": merge_prompt},
-            {"role": "user", "content": json.dumps(filtered_criteria)}
-        ]
+        llama_merge_prompt = merge_prompt +  (f"### This is the list of criteria for merging the duplicates: {filtered_criteria}. "
+                                              f"Do not generate any code. Just generate the required output in provided json format.")
 
-        openai_client = AzureOpenAIClient()
-        response = openai_client.generate_text(messages=messages, response_format={"type": "json_object"})
+        bedrock_client = BedrockLlamaClient()
+        llama_response = bedrock_client.generate_text_llama(llama_merge_prompt, max_gen_len=2000)
         try:
-            merged_response = json.loads(response["data"].choices[0].message.content).get("response", [])
+            if llama_response["success"] is False:
+                logger.exception(f"Failed to fetch merged response: {llama_response['message']}")
+                return filtered_criteria
+            else:
+                pattern = r'\{[\s\S]*\}'  # Regex pattern to extract JSON
+                match = re.search(pattern, llama_response["data"])
+                if match:
+                    json_str = match.group(0)
+                    merged_response = json.loads(json_str)
+                    merged_response = merged_response.get("response", [])
+                    print("Extracted merged response from draft criteria")
+                else:
+                    logger.exception(f"Failed to fetch merged response: {llama_response['message']}")
+                    return filtered_criteria
+
         except Exception as e:
-            print(f"Failed to parse merged response:{category} {e}")
+            logger.exception(f"Failed to parse merged response:{category} {e}")
             return filtered_criteria
 
         for res in merged_response:
@@ -91,7 +107,7 @@ def _process_criteria(criteria_list, category):
 
         return merged_response
     except Exception as e:
-        print(f"Error processing criteria {category}: {e}")
+        logger.exception(f"Error processing criteria {category}: {e}")
         return []
 
 
@@ -132,6 +148,15 @@ def categorize_generated_criteria(generated_inclusion_criteria, generated_exclus
                 categorized_data.setdefault(criteria_category, {"Inclusion": [], "Exclusion": []})
                 categorized_data[criteria_category][criteria_type].extend(result)
             except Exception as e:
-                print(f"Error processing {criteria_type} criteria for {criteria_category}: {e}")
+                logger.exception(f"Error processing {criteria_type} criteria for {criteria_category}: {e}")
+
+    # remove empty categories
+    categories_to_delete = []
+    for category, data in categorized_data.items():
+        if len(data["Inclusion"]) == 0 and len(data["Exclusion"]) == 0:
+            categories_to_delete.append(category)
+
+    for category in categories_to_delete:
+        del categorized_data[category]
 
     return categorized_data

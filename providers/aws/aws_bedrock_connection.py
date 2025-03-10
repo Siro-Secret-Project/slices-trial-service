@@ -47,6 +47,7 @@ class BedrockLlamaClient:
         <|eot_id|>
         <|start_header_id|>assistant<|end_header_id|>
         """
+        print(f"Length of formatted_prompt: {len(formatted_prompt)}")
 
         request_payload = json.dumps({
             "prompt": formatted_prompt,

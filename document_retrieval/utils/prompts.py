@@ -316,6 +316,7 @@ medical_writer_agent_role = (
                   Do not modify the original statements; they must remain as they appear in the trial documents.
                   Do not generate similar criteria again if the statement is same but values are different then they are different statements and must be generated
                   Ensure consistency between extracted criteria, user inputs, and trial goals.
+                  You have 2 generate only 1 JSON with 2 keys "inclusionCriteria" and "exclusionCriteria" and not 2 separately.
             """
 )
 

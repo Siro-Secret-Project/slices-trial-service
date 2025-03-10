@@ -1,8 +1,8 @@
 import concurrent.futures
+import logging
 from database.mongo_db_connection import MongoDBDAO
 from typing import Dict, List, Any
 from agents.TrialEligibilityAgent import TrialEligibilityAgent
-from providers.openai.azure_openai_connection import AzureOpenAIClient
 from database.document_retrieval.fetch_processed_trial_document_with_nct_id import fetch_processed_trial_document_with_nct_id
 from database.document_retrieval.record_eligibility_criteria_job import record_eligibility_criteria_job
 from database.document_retrieval.fetch_similar_trials_inputs_with_ecid import fetch_similar_trials_inputs_with_ecid
@@ -12,7 +12,12 @@ from database.document_retrieval.store_notification_data import store_notificati
 from database.document_retrieval.update_workflow_status import update_workflow_status
 from document_retrieval.utils.generate_trial_eligibility_certeria.categorize_generated_criteria import categorize_generated_criteria
 from document_retrieval.utils.generate_trial_eligibility_certeria.merge_duplicate_values import merge_duplicate_values, normalize_bmi_ranges
+from document_retrieval.models.routes_models import DraftEligibilityCriteria
 
+
+# Setup Logger
+logger = logging.getLogger("document_retrieval")
+logger.setLevel(logging.DEBUG)
 
 def fetch_user_inputs(ecid: str) -> Dict[str, Any]:
     """Fetch user inputs from the database."""
@@ -38,8 +43,6 @@ def prepare_similar_documents(trial_documents: List[Dict[str, Any]], trail_docum
                     "inclusionCriteria": doc["inclusionCriteria"],
                     "exclusionCriteria": doc["exclusionCriteria"],
                     "primaryOutcomes": doc["primaryOutcomes"],
-                    "secondaryOutcomes": doc["secondaryOutcomes"],
-                    "interventions": doc["interventions"]
                 }
             })
     similar_documents.sort(key=lambda x: x["similarity_score"], reverse=True)
@@ -49,7 +52,7 @@ def prepare_similar_documents(trial_documents: List[Dict[str, Any]], trail_docum
 def process_batch(batch: Dict[str, Any], eligibility_agent: TrialEligibilityAgent, user_inputs: Dict[str, Any],
                  generated_inclusion_criteria: List[Any], generated_exclusion_criteria: List[Any]) -> Dict[str, Any]:
     """Process a batch of similar trial documents."""
-    response = eligibility_agent.draft_eligibility_criteria(
+    draft_criteria = DraftEligibilityCriteria(
         sample_trial_rationale=user_inputs.get("rationale", "No rationale provided"),
         similar_trial_documents=batch,
         user_provided_inclusion_criteria=user_inputs.get("inclusionCriteria", "No inclusion criteria provided"),
@@ -58,7 +61,9 @@ def process_batch(batch: Dict[str, Any], eligibility_agent: TrialEligibilityAgen
         user_provided_trial_conditions=user_inputs.get("condition", "No trial conditions provided"),
         generated_inclusion_criteria=generated_inclusion_criteria,
         generated_exclusion_criteria=generated_exclusion_criteria
+
     )
+    response = eligibility_agent.draft_eligibility_criteria(draft_criteria=draft_criteria)
     if not response["success"]:
         return {"error": response["message"]}
     return response["data"]
@@ -75,10 +80,13 @@ def categorize_and_merge_data(generated_inclusion_criteria: List[Dict[str, Any]]
                              drug_ranges: List[Dict[str, Any]], time_line: List[Dict[str, Any]],
                              eligibility_agent: TrialEligibilityAgent, inclusion_criteria: str, exclusion_criteria: str) -> Dict[str, Any]:
     """Categorize and merge generated and user data."""
+
+    logger.debug("Categorizing generated criteria")
     categorized_generated_data = categorize_generated_criteria(
         generated_inclusion_criteria=generated_inclusion_criteria,
         generated_exclusion_criteria=generated_exclusion_criteria
     )
+    logger.debug("Categorizing user data")
     categorized_user_data_response = categorize_eligibility_criteria(eligibility_agent, inclusion_criteria, exclusion_criteria)
     categorized_user_data = categorized_user_data_response["data"] if categorized_user_data_response["success"] else {}
 
@@ -133,19 +141,20 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: Li
         user_inputs = user_inputs_data["userInput"]
         trial_documents = user_inputs_data["similarTrials"]
 
+        logger.debug("Fetching Similar documents")
         similar_documents = prepare_similar_documents(trial_documents, trail_documents_ids)
 
-        openai_client = AzureOpenAIClient()
-        eligibility_agent = TrialEligibilityAgent(openai_client, response_format={"type": "json_object"})
+        eligibility_agent = TrialEligibilityAgent()
 
         generated_inclusion_criteria = []
         generated_exclusion_criteria = []
         drug_ranges = []
         time_line = []
 
+        logger.debug(f"Generating trial eligibility criteria")
         batches = [similar_documents[i] for i in range(0, len(similar_documents))]
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
             future_to_batch = {executor.submit(process_batch, batch, eligibility_agent, user_inputs, generated_inclusion_criteria, generated_exclusion_criteria): batch for batch in batches}
 
             for future in concurrent.futures.as_completed(future_to_batch):
@@ -160,12 +169,15 @@ async def generate_trial_eligibility_criteria(ecid: str, trail_documents_ids: Li
 
         assign_unique_ids(generated_inclusion_criteria)
         assign_unique_ids(generated_exclusion_criteria)
+        logger.debug(f"Generated trial eligibility criteria")
 
+        logger.debug("Categorizing Generated Eligibility")
         categorized_data = categorize_and_merge_data(
             generated_inclusion_criteria, generated_exclusion_criteria, drug_ranges, time_line,
             eligibility_agent, user_inputs.get("inclusionCriteria", "No inclusion criteria provided"),
             user_inputs.get("exclusionCriteria", "No exclusion criteria provided")
         )
+        logger.debug(f"Categorized Generated Eligibility")
 
         db_response = record_eligibility_criteria_job(ecid, categorized_data["categorized_generated_data"], categorized_data["categorized_user_data"], categorized_data["metrics_data"])
         store_notification_data(ecid=ecid)

@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional, List
+from typing import Any, Literal, Optional, List, Dict
 from pydantic import BaseModel, Field
 
 class BaseResponse(BaseModel):
@@ -41,4 +41,15 @@ class DocumentFilters(DocumentSearch):
     sampleSizeMax: Optional[str] = ""
     countryLogic: Literal["AND", "OR"] = "OR"
     safetyAssessment: Optional[str] = ""
+
+
+class DraftEligibilityCriteria(BaseModel):
+    sample_trial_rationale: str
+    similar_trial_documents: Dict
+    user_provided_inclusion_criteria: str
+    user_provided_exclusion_criteria: str
+    user_provided_trial_conditions: str
+    user_provided_trial_outcome: str
+    generated_inclusion_criteria: List
+    generated_exclusion_criteria: List
 

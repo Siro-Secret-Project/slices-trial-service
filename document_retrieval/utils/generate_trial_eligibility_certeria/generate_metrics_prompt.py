@@ -46,23 +46,24 @@ def generate_metrics_prompt(values: list):
     str_drug_metrics_keys = ", ".join(drug_metrics_keys)
 
     metrics_base_prompt = (
-    f"""
-    Given a list of Eligibility criteria for T2DM clinical trials, extract all unique {str_drug_metrics_keys} ranges/medical terms, 
-    count their occurrences, and return the source document IDs where each criterion appears.
-    ### Input Format:
-    A list of dictionaries where:
-      - "nctId" represents the unique study ID.
-      - "inclusionCriteria"/"exclusionCriteria" contains text specifying {str_drug_metrics_keys} ranges/medical terms.
+        f"""
+        Given a list of Eligibility criteria for T2DM clinical trials, extract all unique {str_drug_metrics_keys} ranges/medical terms,
+        count their occurrences, and return the source document IDs where each criterion appears.
+        If any values is not provided do not provide it in output. Like if pregnancy is not provided as criteria do not return it in output
+        ### Input Format:
+        A list of dictionaries where:
+          - "nctId" represents the unique study ID.
+          - "inclusionCriteria"/"exclusionCriteria" contains text specifying {str_drug_metrics_keys} ranges/medical terms.
 
-    ### Instructions:
-      1. Extract all unique {str_drug_metrics_keys} ranges/medical terms.
-      2. Normalize the ranges:
-        - If a statement says "greater than 7.0", replace it with ">7.5".
-        - If it says "less than 10.0", replace it with "<9.5".
-      3. Count occurrences of each unique range.
-      4. Track the source document IDs where each range appears.
-      5. Return a structured JSON output.
-    """
+        ### Instructions:
+          1. Extract all unique {str_drug_metrics_keys} ranges/medical terms.
+          2. Normalize the ranges:
+            - If a statement says "greater than 7.0", replace it with ">7.5".
+            - If it says "less than 10.0", replace it with "<9.5".
+          3. Count occurrences of each unique range.
+          4. Track the source document IDs where each range appears.
+          5. Return a structured JSON output.
+        """
     )
 
     output = generate_output(values, num_trials=2)
@@ -70,10 +71,10 @@ def generate_metrics_prompt(values: list):
 
     sample_input_prompt = (
         f"""
-        ### Example Input:
-          ```json
-          {input_document}
-      """
+            ### Example Input:
+              ```json
+              {input_document}
+          """
     )
 
     output_examples = []
@@ -81,18 +82,26 @@ def generate_metrics_prompt(values: list):
         for entry in entries:
             output_examples.append(entry)
 
-
-
     response = f"response:{output_examples}"
 
     sample_output_prompt = (
         f"""
-        ### Expected Output:
+            ### Expected Output:
 
-        json_object:
-        {response}
-        """
+            json_object:
+            {{
+              {response}
+            }}
+            """
     )
 
-    return metrics_base_prompt + sample_input_prompt + sample_output_prompt
+    note = f"""
+        ### Note: 1. Elements of JSON must always be enclosed in double quotes and not single quotes.
+                  2. Never generate a code for output. Just return a JSON of values and their count
+        """
+
+    final_prompt = metrics_base_prompt + sample_input_prompt + sample_output_prompt + note
+    final_prompt = final_prompt.replace("'", '"')
+
+    return final_prompt
 
